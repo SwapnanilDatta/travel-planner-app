@@ -202,6 +202,14 @@ Hotel Location
 
 # Phase 5 — Preference Collection
 
+Instead of a free-text form, members use a **Voting System** on predefined categories to express preferences.
+
+Categories:
+* History (Rate 1-5)
+* Food (Rate 1-5)
+* Nature (Rate 1-5)
+* Shopping (Rate 1-5)
+
 Each member submits:
 
 ```python
@@ -209,30 +217,12 @@ UserPreference
 -------------
 user
 group
-
 budget
-
 trip_style
-
 walking_limit
-
-interests
-
+category_votes  # JSON storing the 1-5 votes
 days
-
 embedding
-```
-
-Example Interests:
-
-```text
-History
-Architecture
-Food
-Nature
-Photography
-Museums
-Nightlife
 ```
 
 ---
@@ -241,12 +231,14 @@ Nightlife
 
 ## Generate User Preference Text
 
+Convert the user's category votes into a descriptive text line.
+
 Example:
 
 ```text
-Interested in history, food and architecture.
-Budget 15000.
-Travel style moderate.
+User voted History=5, Food=4, Nature=2, Shopping=1.
+Generated text: "Highly interested in history and food. Moderately interested in nature. Not interested in shopping."
+Budget 15000. Travel style moderate.
 ```
 
 ## Generate Embedding
@@ -331,13 +323,13 @@ Method:
 
 ```python
 For user in group:
-    user_top_pois = pgvector_search(user.embedding)
+    user_top_pois = pgvector_search(user.embedding, limit=30)
 ```
 
 ## Step 3
 
 Pool all candidate POIs from all users into a unique candidate set.
-This prevents the "mushy middle" problem where an averaged group vector points to a generic attraction nobody actually wants.
+For example, if User A retrieves 30 POIs and User B retrieves 30 POIs, pooling them and removing duplicates might yield 55 unique Candidate POIs.
 
 ## Step 3
 
@@ -361,37 +353,23 @@ Top 20 Most Relevant Attractions
 
 ---
 
-# Phase 9 — Conflict-Aware Recommendations
+# Phase 9 — POI Clustering (Diversity & Fairness)
 
-Problem:
-
-```text
-User A likes history
-User B likes history
-User C likes nature
-```
-
-Avoid recommending only historical sites.
+Instead of ranking all POIs together or doing complex scoring, we **cluster** the pool of candidate POIs.
 
 ## Approach
 
-Calculate:
+Cluster the unique candidate POIs (e.g., the 55 POIs) using:
 
-```python
-similarity(user_embedding, poi_embedding)
-```
+* KMeans
+* Agglomerative Clustering
+* DBSCAN
 
-for every user.
+Features for clustering:
+* POI Embeddings
+* POI Categories
 
-Final score:
-
-```python
-0.7 * average_score
-+
-0.3 * minimum_score
-```
-
-This prevents ignoring minority preferences.
+This naturally groups the POIs into diverse clusters (e.g., a "History/Museums" cluster, a "Nature/Parks" cluster, a "Shopping/Food" cluster).
 
 ---
 
@@ -434,9 +412,13 @@ Use:
 Google OR-Tools
 ```
 
+## Daily Mix Strategy
+If the trip days are fixed, we **mix the POIs** from the different clusters we generated in Phase 9. 
+We force the optimizer to pick POIs from multiple clusters per day so that *nobody has a bad day*. For example, every day gets a mix of History, Food, and Nature, rather than dedicating an entire day to just museums.
+
 Input:
 
-* Top POIs
+* Clustered Top POIs
 * Budget
 * Travel days
 * Opening hours
@@ -447,20 +429,17 @@ Constraints:
 
 ```text
 Daily Time Limit
-
 Budget Limit
-
 Opening Hours (requires parsing OSM string hours into integer minutes)
-
 Walking Limit
-
 Hotel Return Time
+Cluster Diversity Constraint (At least X different clusters per day)
 ```
 
 Objective:
 
 ```text
-Maximize Group Satisfaction
+Maximize Group Satisfaction (using clustered representation)
 Minimize Travel Time
 ```
 
@@ -468,12 +447,13 @@ Output:
 
 ```text
 Day 1
-  Red Fort
-  India Gate
+  Red Fort (History Cluster)
+  Sarojini Market (Shopping Cluster)
+  India Gate (Nature/Leisure Cluster)
 
 Day 2
-  Qutub Minar
-  Humayun Tomb
+  Qutub Minar (History Cluster)
+  Dilli Haat (Food/Shopping Cluster)
 ```
 
 ---

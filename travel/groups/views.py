@@ -1,8 +1,29 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+import requests
 from .models import ChatGroup, Trip, UserPreference
 from .forms import TripForm, UserPreferenceForm
+
+from django.conf import settings
+
+def get_coordinates(query, prox_lat=None, prox_lon=None):
+    if not settings.OPENCAGE_API_KEY:
+        print("Missing OPENCAGE_API_KEY")
+        return None, None
+    try:
+        url = 'https://api.opencagedata.com/geocode/v1/json'
+        params = {'q': query, 'key': settings.OPENCAGE_API_KEY, 'limit': 1}
+        if prox_lat is not None and prox_lon is not None:
+            params['proximity'] = f"{prox_lat},{prox_lon}"
+        headers = {'User-Agent': 'GroupTravelPlannerApp/1.0'}
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        if response.status_code == 200 and len(response.json().get('results', [])) > 0:
+            data = response.json()['results'][0]['geometry']
+            return float(data['lat']), float(data['lng'])
+    except Exception as e:
+        print(f"Geocoding error: {e}")
+    return None, None
 
 @login_required
 def home(request):
@@ -79,13 +100,35 @@ def create_trip(request, code):
         if form.is_valid():
             trip = form.save(commit=False)
             trip.group = group
+            
+            # Geocode Destination City
+            city_lat, city_lon = get_coordinates(trip.destination_city)
+            if city_lat is not None and city_lon is not None:
+                trip.destination_lat = city_lat
+                trip.destination_lon = city_lon
+            
+            # Geocode Hotel
+            if trip.hotel_name:
+                hotel_lat, hotel_lon = get_coordinates(trip.hotel_name, prox_lat=city_lat, prox_lon=city_lon)
+                if hotel_lat is not None and hotel_lon is not None:
+                    trip.hotel_lat = hotel_lat
+                    trip.hotel_lon = hotel_lon
+                else:
+                    # Fallback to city coordinates
+                    trip.hotel_lat = city_lat
+                    trip.hotel_lon = city_lon
+                    
             trip.save()
-            messages.success(request, 'Trip created successfully!')
+            messages.success(request, 'Trip created successfully (Geocoded)!')
             return redirect('group_detail', code=group.code)
     else:
         form = TripForm()
         
-    return render(request, 'groups/create_trip.html', {'form': form, 'group': group})
+    return render(request, 'groups/create_trip.html', {
+        'form': form, 
+        'group': group,
+        'opencage_api_key': settings.OPENCAGE_API_KEY
+    })
 
 @login_required
 def submit_preference(request, code):
@@ -105,9 +148,6 @@ def submit_preference(request, code):
             messages.success(request, 'Preferences saved!')
             return redirect('group_detail', code=group.code)
     else:
-        initial = {}
-        if existing_pref and existing_pref.interests:
-            initial['interests_str'] = ', '.join(existing_pref.interests)
-        form = UserPreferenceForm(instance=existing_pref, initial=initial)
+        form = UserPreferenceForm(instance=existing_pref)
         
     return render(request, 'groups/submit_preference.html', {'form': form, 'group': group})

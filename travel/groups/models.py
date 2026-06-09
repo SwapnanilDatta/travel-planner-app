@@ -25,6 +25,8 @@ class ChatGroup(models.Model):
 class Trip(models.Model):
     group = models.OneToOneField(ChatGroup, on_delete=models.CASCADE, related_name='trip')
     destination_city = models.CharField(max_length=100)
+    destination_lat = models.FloatField(blank=True, null=True)
+    destination_lon = models.FloatField(blank=True, null=True)
     start_date = models.DateField()
     end_date = models.DateField()
     hotel_name = models.CharField(max_length=100, blank=True, null=True)
@@ -40,7 +42,7 @@ class UserPreference(models.Model):
     budget = models.DecimalField(max_digits=10, decimal_places=2)
     trip_style = models.CharField(max_length=50)
     walking_limit = models.FloatField(help_text="In kilometers")
-    interests = models.JSONField(default=list)
+    category_votes = models.JSONField(default=dict)
     days = models.IntegerField()
     embedding = models.TextField(blank=True, null=True)
 

@@ -21,4 +21,47 @@
         </div>
     </div>
 </div>
+
+<script>
+    const apiKey = '{{ opencage_api_key }}';
+    
+    function setupAutocomplete(inputId, datalistId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        
+        // Create datalist element
+        const datalist = document.createElement('datalist');
+        datalist.id = datalistId;
+        document.body.appendChild(datalist);
+        input.setAttribute('list', datalistId);
+        
+        let timeout = null;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const query = this.value;
+            if (query.length < 3) return;
+            
+            timeout = setTimeout(() => {
+                // If hotel, we might want to prioritize POIs or the selected city, but for simplicity, general search
+                fetch(`https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(query)}&key=${apiKey}&limit=5`)
+                    .then(response => response.json())
+                    .then(data => {
+                        datalist.innerHTML = '';
+                        if (data.results) {
+                            data.results.forEach(result => {
+                                const option = document.createElement('option');
+                                option.value = result.formatted;
+                                datalist.appendChild(option);
+                            });
+                        }
+                    });
+            }, 300); // 300ms debounce
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        setupAutocomplete('id_destination_city', 'city-list');
+        setupAutocomplete('id_hotel_name', 'hotel-list');
+    });
+</script>
 {% endblock %}

@@ -42,10 +42,14 @@
             </div>
             <div class="card-body">
                 {% if trip %}
-                <p><strong>Destination:</strong> {{ trip.destination_city }}</p>
+                <p><strong>Destination:</strong> {{ trip.destination_city }} 
+                   {% if trip.destination_lat %}<small class="text-muted">(Lat: {{ trip.destination_lat|floatformat:4 }}, Lon: {{ trip.destination_lon|floatformat:4 }})</small>{% endif %}
+                </p>
                 <p><strong>Dates:</strong> {{ trip.start_date }} to {{ trip.end_date }}</p>
                 {% if trip.hotel_name %}
-                <p><strong>Hotel:</strong> {{ trip.hotel_name }}</p>
+                <p><strong>Hotel:</strong> {{ trip.hotel_name }}
+                   {% if trip.hotel_lat %}<small class="text-muted">(Lat: {{ trip.hotel_lat|floatformat:4 }}, Lon: {{ trip.hotel_lon|floatformat:4 }})</small>{% endif %}
+                </p>
                 {% endif %}
                 {% else %}
                 <p class="text-muted">No trip created yet.</p>
