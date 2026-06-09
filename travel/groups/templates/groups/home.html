@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>Your Groups</h2>
+    </div>
+    <div class="col text-end">
+        <a href="{% url 'create_group' %}" class="btn btn-primary">Create Group</a>
+        <a href="{% url 'join_group' %}" class="btn btn-secondary">Join Group</a>
+    </div>
+</div>
+
+<div class="row">
+    {% for group in groups %}
+    <div class="col-md-4 mb-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ group.name }}</h5>
+                <p class="card-text text-muted">Code: <strong>{{ group.code }}</strong></p>
+                <a href="{% url 'chat_room' group.code %}" class="btn btn-outline-primary w-100 mt-auto">Enter Chat</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col">
+        <div class="alert alert-info">You are not in any groups yet. Create or join one!</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

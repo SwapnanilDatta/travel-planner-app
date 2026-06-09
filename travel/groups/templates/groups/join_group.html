@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm mt-5">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Join a Group</h3>
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="code" class="form-label">Group Code</label>
+                        <input type="text" class="form-control" id="code" name="code" required>
+                    </div>
+                    <button class="btn btn-secondary w-100" type="submit">Join</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
