@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2>{{ group.name }} Dashboard</h2>
+        <p class="text-muted">Invite Code: <strong>{{ group.code }}</strong></p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'chat_room' group.code %}" class="btn btn-outline-primary">Chat</a>
+        {% if is_host and not group.is_locked %}
+        <form action="{% url 'lock_group' group.code %}" method="post" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Lock Group</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Group Details</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Status:</strong> {% if group.is_locked %}<span class="badge bg-danger">Locked</span>{% else %}<span class="badge bg-success">Open</span>{% endif %}</p>
+                <p><strong>Host:</strong> {{ group.creator.username }}</p>
+                <p><strong>Members:</strong> {{ group.members.count }}</p>
+                <ul>
+                    {% for member in group.members.all %}
+                    <li>{{ member.username }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Trip Details</h5>
+            </div>
+            <div class="card-body">
+                {% if trip %}
+                <p><strong>Destination:</strong> {{ trip.destination_city }}</p>
+                <p><strong>Dates:</strong> {{ trip.start_date }} to {{ trip.end_date }}</p>
+                {% if trip.hotel_name %}
+                <p><strong>Hotel:</strong> {{ trip.hotel_name }}</p>
+                {% endif %}
+                {% else %}
+                <p class="text-muted">No trip created yet.</p>
+                {% if is_host and group.is_locked %}
+                <a href="{% url 'create_trip' group.code %}" class="btn btn-primary">Create Trip</a>
+                {% elif is_host %}
+                <p class="text-warning small">You must lock the group before creating a trip.</p>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Preferences</h5>
+                {% if group.is_locked %}
+                <a href="{% url 'submit_preference' group.code %}" class="btn btn-sm btn-primary">
+                    {% if has_submitted_preference %}Update Preferences{% else %}Submit Preferences{% endif %}
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if not group.is_locked %}
+                <p class="text-muted">Preferences can only be submitted after the group is locked.</p>
+                {% else %}
+                <ul class="list-group">
+                    {% for pref in group.preferences.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ pref.user.username }}
+                        <span class="badge bg-success rounded-pill">Submitted</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-muted">No members have submitted preferences yet.</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

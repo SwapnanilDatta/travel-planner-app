@@ -16,7 +16,33 @@ class ChatGroup(models.Model):
     code = models.CharField(max_length=8, unique=True, default=generate_unique_code)
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_groups')
     members = models.ManyToManyField(User, related_name='chat_groups')
+    is_locked = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
+
+class Trip(models.Model):
+    group = models.OneToOneField(ChatGroup, on_delete=models.CASCADE, related_name='trip')
+    destination_city = models.CharField(max_length=100)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    hotel_name = models.CharField(max_length=100, blank=True, null=True)
+    hotel_lat = models.FloatField(blank=True, null=True)
+    hotel_lon = models.FloatField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.group.name} - {self.destination_city}"
+
+class UserPreference(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='preferences')
+    group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, related_name='preferences')
+    budget = models.DecimalField(max_digits=10, decimal_places=2)
+    trip_style = models.CharField(max_length=50)
+    walking_limit = models.FloatField(help_text="In kilometers")
+    interests = models.JSONField(default=list)
+    days = models.IntegerField()
+    embedding = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.group.name}"
