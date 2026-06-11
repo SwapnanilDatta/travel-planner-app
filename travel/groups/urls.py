@@ -9,4 +9,5 @@ urlpatterns = [
     path('group/<str:code>/lock/', views.lock_group, name='lock_group'),
     path('group/<str:code>/trip/create/', views.create_trip, name='create_trip'),
     path('group/<str:code>/preference/', views.submit_preference, name='submit_preference'),
+    path('group/<str:code>/plan/', views.plan_itinerary, name='plan_itinerary'),
 ]

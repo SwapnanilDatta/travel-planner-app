@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+<div class="container mt-4" x-data="itineraryPlanner()">
+    <h2 class="mb-4">Plan Itinerary for {{ group.name }}</h2>
+
+    <div x-show="!result" class="card shadow-sm">
+        <div class="card-body">
+            <form @submit.prevent="submitForm">
+                {% csrf_token %}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Destinations (comma-separated)</label>
+                        <input type="text" class="form-control" x-model="destinationsInput"
+                            placeholder="e.g. Delhi, Agra" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Total Days</label>
+                        <input type="number" class="form-control" x-model="payload.total_days" min="1" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Group Size</label>
+                        <input type="number" class="form-control" x-model="payload.group_size" min="1" required>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Budget Per Day (INR)</label>
+                        <select class="form-select" x-model="payload.budget_per_day_INR" required>
+                            <option value="Under 500">Under 500</option>
+                            <option value="500-1500">500-1500</option>
+                            <option value="1500-3000">1500-3000</option>
+                            <option value="3000+">3000+</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Budget Type</label>
+                        <select class="form-select" x-model="payload.budget_type" required>
+                            <option value="per_person">Per Person</option>
+                            <option value="per_group">Per Group</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" x-model="payload.use_llm" id="useLlm">
+                            <label class="form-check-label" for="useLlm">
+                                Use LLM Enhancement
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>Members</h4>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @click="addMember">Add Member</button>
+                </div>
+
+                <template x-for="(member, index) in payload.members" :key="index">
+                    <div class="card mb-3 bg-light">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <h5>Member <span x-text="index + 1"></span></h5>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @click="removeMember(index)"
+                                    x-show="payload.members.length > 1">Remove</button>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" class="form-control" x-model="member.name" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Age Group (e.g. 25-35)</label>
+                                    <input type="text" class="form-control" x-model="member.age_group" required>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox"
+                                            x-model="member.mobility_constraints">
+                                        <label class="form-check-label">Mobility Constraints</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6>Preferences (Rating 1-5)</h6>
+                            <div class="row">
+                                <template x-for="(rating, category) in member.preferences" :key="category">
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label text-sm" x-text="category"></label>
+                                        <input type="number" class="form-control form-control-sm"
+                                            x-model.number="member.preferences[category]" min="1" max="5">
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-success btn-lg" :disabled="loading">
+                        <span x-show="!loading">Generate Itinerary</span>
+                        <span x-show="loading">Generating... This may take a while.</span>
+                    </button>
+                </div>
+
+                <div x-show="error" class="alert alert-danger mt-3" x-text="error"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div x-show="result" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Generated Itinerary</h3>
+            <button class="btn btn-outline-secondary btn-sm" @click="result = null">Back to Form</button>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">City Report</h5>
+            </div>
+            <div class="card-body" x-show="result && result.city_report">
+                <p><strong>Destinations:</strong> <span x-text="result?.city_report?.destinations ? result.city_report.destinations.join(', ') : ''"></span></p>
+                <div class="mb-3">
+                    <strong>Attractions and Activities:</strong>
+                    <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.city_report?.attractions_and_activities"></div>
+                </div>
+                <div class="mb-3">
+                    <strong>Recommendations:</strong>
+                    <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.city_report?.recommendations"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">Travel Plan</h5>
+            </div>
+            <div class="card-body" x-show="result && result.travel_plan">
+                <div class="mb-4">
+                    <strong>Overall Plan:</strong>
+                    <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.travel_plan?.overall_plan"></div>
+                </div>
+                <div>
+                    <strong>Daily Itinerary:</strong>
+                    <div class="p-3 bg-white border rounded mt-2" style="white-space: pre-wrap; font-family: monospace;" x-text="result?.travel_plan?.daily_itinerary"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const INITIAL_DATA = {{ initial_data_json| safe }};
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('itineraryPlanner', () => {
+            const initialData = INITIAL_DATA;
+            return {
+                destinationsInput: initialData.destinationsInput || '',
+                payload: initialData.payload || {
+                    destinations: [],
+                    total_days: 1,
+                    group_size: 1,
+                    pace: "Moderate",
+                    budget_per_day_INR: "1500-3000",
+                    budget_type: "per_person",
+                    use_llm: false,
+                    members: []
+                },
+                loading: false,
+                error: null,
+                result: null,
+
+                addMember() {
+                    this.payload.members.push({
+                        name: `Member ${this.payload.members.length + 1}`,
+                        age_group: "25-35",
+                        mobility_constraints: false,
+                        preferences: {
+                            "nature": 5,
+                            "photography": 4,
+                            "history": 2
+                        }
+                    });
+                },
+                removeMember(index) {
+                    this.payload.members.splice(index, 1);
+                },
+                async submitForm() {
+                    this.loading = true;
+                    this.error = null;
+
+                    // Clean up destinations
+                    this.payload.destinations = this.destinationsInput.split(',').map(d => d.trim()).filter(d => d);
+
+                    try {
+                        const response = await fetch("{% url 'plan_itinerary' group.code %}", {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                            },
+                            body: JSON.stringify(this.payload)
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            this.result = data;
+                        } else {
+                            this.error = data.message || "Failed to generate itinerary. Ensure the FastAPI microservice is running.";
+                        }
+                    } catch (err) {
+                        this.error = "A network error occurred: " + err.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        })
+    })
+</script>
+{% endblock %}

@@ -4,6 +4,8 @@ from django.contrib import messages
 import requests
 from .models import ChatGroup, Trip, UserPreference
 from .forms import TripForm, UserPreferenceForm
+from django.http import JsonResponse
+import json
 
 from django.conf import settings
 
@@ -151,3 +153,85 @@ def submit_preference(request, code):
         form = UserPreferenceForm(instance=existing_pref)
         
     return render(request, 'groups/submit_preference.html', {'form': form, 'group': group})
+
+@login_required
+def plan_itinerary(request, code):
+    group = get_object_or_404(ChatGroup, code=code)
+    if request.user != group.creator:
+        messages.error(request, 'Only the host can plan the itinerary.')
+        return redirect('group_detail', code=group.code)
+    
+    if request.method == 'POST':
+        try:
+            payload = json.loads(request.body)
+            response = requests.post('http://127.0.0.1:8002/plan-trip', json=payload)
+            if response.status_code == 200:
+                return JsonResponse(response.json())
+            else:
+                return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+    initial_members = []
+    max_days = 1
+    total_budget = 0.0
+    for pref in group.preferences.all():
+        initial_members.append({
+            'name': pref.user.username,
+            'age_group': "25-35", # Default
+            'mobility_constraints': pref.walking_limit < 5.0 if pref.walking_limit is not None else False,
+            'preferences': pref.category_votes or {
+                "nature": 5,
+                "photography": 4,
+                "history": 2
+            }
+        })
+        if pref.days and pref.days > max_days:
+            max_days = pref.days
+        if pref.budget:
+            total_budget += float(pref.budget)
+            
+    # Try to determine budget per day per person
+    group_size = group.members.count()
+    if group_size > 0 and max_days > 0:
+        avg_budget_per_day = (total_budget / group_size) / max_days
+        if avg_budget_per_day < 500:
+            budget_str = "Under 500"
+        elif avg_budget_per_day <= 1500:
+            budget_str = "500-1500"
+        elif avg_budget_per_day <= 3000:
+            budget_str = "1500-3000"
+        else:
+            budget_str = "3000+"
+    else:
+        budget_str = "1500-3000"
+        
+    initial_data = {
+        'destinationsInput': group.trip.destination_city if hasattr(group, 'trip') else "",
+        'payload': {
+            'destinations': [],
+            'total_days': max_days if max_days > 1 else 4,
+            'group_size': group_size if group_size > 0 else 4,
+            'pace': "moderate",
+            'budget_per_day_INR': "3000",
+            'budget_type': "mid-range",
+            'use_llm': True,
+            'members': initial_members if initial_members else [
+                {
+                    'name': "Host",
+                    'age_group': "25-35",
+                    'mobility_constraints': False,
+                    'preferences': {
+                        "nature": 5,
+                        "photography": 4,
+                        "history": 2
+                    }
+                }
+            ]
+        }
+    }
+
+    return render(request, 'groups/plan_itinerary.html', {
+        'group': group,
+        'initial_data_json': json.dumps(initial_data)
+    })

@@ -1,28 +1,32 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, create_engine
-from sqlalchemy.orm import declarative_base
+from pydantic import BaseModel, Field
+from typing import List, Dict, Optional, Any
 
-Base = declarative_base()
+class Member(BaseModel):
+    name: str
+    age_group: str
+    mobility_constraints: bool
+    preferences: Dict[str, int]
 
-class Place(Base):
-    __tablename__ = "places"
+class TripRequest(BaseModel):
+    destinations: List[str]
+    total_days: int
+    group_size: int
+    pace: str
+    budget_per_day_INR: str
+    budget_type: str
+    use_llm: bool = False
+    members: List[Member]
 
-    id = Column(Integer, primary_key=True, index=True)
-    zone = Column(String, nullable=True)
-    state = Column(String, nullable=True)
-    city = Column(String, index=True)
-    name = Column(String, index=True)
-    type = Column(String, index=True)
-    establishment_year = Column(String, nullable=True)
-    time_needed_hours = Column(Float, nullable=True)
-    google_review_rating = Column(Float, nullable=True)
-    entrance_fee_inr = Column(Float, nullable=True)
-    airport_with_50km_radius = Column(String, nullable=True)
-    weekly_off = Column(String, nullable=True)
-    significance = Column(String, nullable=True)
-    dslr_allowed = Column(String, nullable=True)
-    number_of_google_reviews_in_lakhs = Column(Float, nullable=True)
-    best_time_to_visit = Column(String, nullable=True)
-    
-    # Derivable fields not in original CSV
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
+# Output schemas for the 2 JSONs
+class CityReportOutput(BaseModel):
+    destinations: List[str]
+    attractions_and_activities: str
+    recommendations: str
+
+class TravelPlanOutput(BaseModel):
+    overall_plan: str
+    daily_itinerary: str
+
+class TripResponse(BaseModel):
+    city_report: CityReportOutput
+    travel_plan: TravelPlanOutput

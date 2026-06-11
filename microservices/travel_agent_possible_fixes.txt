@@ -1,0 +1,103 @@
+Travel Planning Agent - Proposed Fixes
+
+Objective
+
+Improve speed, scalability, output quality, and JSON consistency for
+multi-agent travel planning, especially for large groups.
+
+1. Search Once, Reuse Everywhere
+
+-   Introduce a dedicated Research Agent responsible for all web
+    searches.
+-   Other agents should consume structured research results instead of
+    performing their own searches.
+-   Eliminate duplicate search queries.
+
+Pipeline: User -> Preference Aggregator -> Research Agent -> Structured
+JSON -> Logistics Agent -> Budget Agent -> Recommendation Agent ->
+Planner -> Schema Validator -> Renderer
+
+2. Aggregate Group Preferences First
+
+Instead of planning per member: - Compute overall preference weights. -
+Determine mobility constraints, pace, and budget at the group level. -
+Plan using aggregated preferences.
+
+3. Keep Planner Search-Free
+
+Planner should: - Receive structured JSON - Score attractions - Schedule
+itinerary - Return structured output
+
+Planner should NOT perform web searches.
+
+4. Produce Structured JSON, Not Prose
+
+Generate normalized objects such as: - attractions - activities -
+logistics - hotels - itinerary
+
+Render human-readable text only at the final stage.
+
+5. Avoid Data Duplication
+
+Current issue: City Report -> Planner -> entire attraction list copied
+again.
+
+Instead: Store attraction IDs and reference them in itinerary.
+
+Example: Day1: - attraction_id: A2 - attraction_id: A5
+
+Renderer resolves IDs into names/details.
+
+6. Cache Research
+
+Cache destination data: - attractions - restaurants - transport -
+opening hours
+
+Reuse cached data for subsequent requests and only regenerate
+itineraries.
+
+7. Parallelize Independent Agents
+
+Run simultaneously: - Logistics - Budget - Recommendations
+
+Merge results in Planner.
+
+8. Enforce a Strict Schema
+
+Use Pydantic or equivalent validation.
+
+Example fields: - name - category - location - duration - accessibility
+
+Reject malformed outputs.
+
+9. Limit Search Output
+
+Search should return only required fields: - name - category -
+location - duration
+
+Avoid long paragraphs from search results.
+
+10. Separate Internal Reasoning from Final Rendering
+
+Internal: JSON
+
+Final: Readable itinerary
+
+Do not mix reasoning with presentation.
+
+11. Modular Output
+
+Instead of one huge object: - city_report.json - travel_plan.json -
+budget.json
+
+This improves maintainability and reduces token usage.
+
+12. Expected Benefits
+
+-   Faster execution
+-   Lower token consumption
+-   Better scalability for large groups
+-   Cleaner JSON
+-   Fewer hallucinations
+-   Easier debugging and validation
+-   Better user experience

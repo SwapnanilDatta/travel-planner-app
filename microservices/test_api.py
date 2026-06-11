@@ -1,45 +1,38 @@
-from fastapi.testclient import TestClient
-from main import app
+import requests
 import json
 
-client = TestClient(app)
-
-def test_plan_itinerary():
-    payload = {
-        "destinations": ["Delhi", "Agra"],
-        "total_days": 5,
-        "group_size": 4,
-        "pace": "Moderate",
-        "budget_per_day_INR": "1500-3000",
-        "members": [
-            {
-                "name": "Ankit",
-                "age_group": "Adult",
-                "mobility_constraints": False,
-                "preferences": {
-                    "Historical & Heritage": 5,
-                    "Food & Local Culture": 4,
-                    "Shopping": 2
-                }
-            },
-            {
-                "name": "Neha",
-                "age_group": "Adult",
-                "mobility_constraints": False,
-                "preferences": {
-                    "Historical & Heritage": 3,
-                    "Nature & Outdoors": 5,
-                    "Photography Spots": 5
-                }
-            }
-        ],
-        "use_llm": True
+data = {
+  "destinations": [
+    "Andaman",
+    "Nicobar"
+  ],
+  "total_days": 4,
+  "group_size": 4,
+  "pace": "moderate",
+  "budget_per_day_INR": "3000",
+  "budget_type": "mid-range",
+  "use_llm": True,
+  "members": [
+    {
+      "name": "Arun",
+      "age_group": "30-40",
+      "mobility_constraints": False,
+      "preferences": {
+        "nature": 5,
+        "photography": 4,
+        "history": 2
+      }
     }
+  ]
+}
 
-    response = client.post("/api/v1/plan-itinerary", json=payload)
-    print(f"Status Code: {response.status_code}")
-    print("Response JSON:")
-    print(json.dumps(response.json(), indent=2))
-
-if __name__ == "__main__":
-    test_plan_itinerary()
+try:
+    print("Testing the API with the proper payload...")
+    response = requests.post("http://127.0.0.1:8002/plan-trip", json=data)
+    print("Status:", response.status_code)
+    try:
+        print(json.dumps(response.json(), indent=2))
+    except:
+        print(response.text)
+except Exception as e:
+    print(f"Error: {e}")

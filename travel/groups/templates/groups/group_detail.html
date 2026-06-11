@@ -6,11 +6,14 @@
         <p class="text-muted">Invite Code: <strong>{{ group.code }}</strong></p>
     </div>
     <div class="col-md-4 text-end">
-        <a href="{% url 'chat_room' group.code %}" class="btn btn-outline-primary">Chat</a>
+        <a href="{% url 'chat_room' group.code %}" class="btn btn-outline-primary mb-1">Chat</a>
+        {% if is_host %}
+        <a href="{% url 'plan_itinerary' group.code %}" class="btn btn-outline-success mb-1">Plan Itinerary</a>
+        {% endif %}
         {% if is_host and not group.is_locked %}
         <form action="{% url 'lock_group' group.code %}" method="post" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger">Lock Group</button>
+            <button type="submit" class="btn btn-danger mb-1">Lock Group</button>
         </form>
         {% endif %}
     </div>
