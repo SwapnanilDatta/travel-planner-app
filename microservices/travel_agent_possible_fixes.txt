@@ -4,100 +4,205 @@ Objective
 
 Improve speed, scalability, output quality, and JSON consistency for
 multi-agent travel planning, especially for large groups.
+"""
 
-1. Search Once, Reuse Everywhere
 
--   Introduce a dedicated Research Agent responsible for all web
-    searches.
--   Other agents should consume structured research results instead of
-    performing their own searches.
--   Eliminate duplicate search queries.
 
-Pipeline: User -> Preference Aggregator -> Research Agent -> Structured
-JSON -> Logistics Agent -> Budget Agent -> Recommendation Agent ->
-Planner -> Schema Validator -> Renderer
 
-2. Aggregate Group Preferences First
 
-Instead of planning per member: - Compute overall preference weights. -
-Determine mobility constraints, pace, and budget at the group level. -
-Plan using aggregated preferences.
 
-3. Keep Planner Search-Free
 
-Planner should: - Receive structured JSON - Score attractions - Schedule
-itinerary - Return structured output
+tasks.py — now includes a PreferenceAggregator that runs before any agent.
 
-Planner should NOT perform web searches.
+Key idea:
+  aggregate_group_preferences(members) → group_profile dict
+  This runs in pure Python (zero LLM calls, zero searches) and produces
+  a concise group-level brief. Agents receive ONLY the brief — never the
+  raw member list — so they don't have to guess how to reconcile conflicts.
+"""
 
-4. Produce Structured JSON, Not Prose
+import math
+from crewai import Task
+from agents import get_city_local_guide, get_travel_trip_expert, get_travel_planning_expert
 
-Generate normalized objects such as: - attractions - activities -
-logistics - hotels - itinerary
 
-Render human-readable text only at the final stage.
+# ── Preference Aggregator ──────────────────────────────────────────────────
 
-5. Avoid Data Duplication
+def aggregate_group_preferences(members: list[dict]) -> dict:
+    """
+    Collapses N member preference dicts into a single group profile.
 
-Current issue: City Report -> Planner -> entire attraction list copied
-again.
+    Returns:
+        {
+            must_have:      list[str]   # avg score >= 7
+            nice_to_have:   list[str]   # avg score 4–6.9
+            avoid:          list[str]   # avg score < 4
+            mobility_required: bool     # True if ANY member has constraint
+            conflicts:      list[str]   # categories where std dev > 2.5
+            raw_scores:     dict        # category → averaged score (for logging)
+            age_groups:     list[str]   # unique age groups in the party
+        }
+    """
+    if not members:
+        return {}
 
-Instead: Store attraction IDs and reference them in itinerary.
+    categories = list(members[0]["preferences"].keys())
 
-Example: Day1: - attraction_id: A2 - attraction_id: A5
+    # ── Step 1: weighted average score per category ────────────────────────
+    raw_scores = {}
+    for cat in categories:
+        vals = [m["preferences"].get(cat, 0) for m in members]
+        raw_scores[cat] = round(sum(vals) / len(vals), 1)
 
-Renderer resolves IDs into names/details.
+    sorted_scores = sorted(raw_scores.items(), key=lambda x: -x[1])
 
-6. Cache Research
+    must_have    = [k for k, v in sorted_scores if v >= 7]
+    nice_to_have = [k for k, v in sorted_scores if 4 <= v < 7]
+    avoid        = [k for k, v in sorted_scores if v < 4]
 
-Cache destination data: - attractions - restaurants - transport -
-opening hours
+    # ── Step 2: mobility — any one member = whole group adjusts ───────────
+    mobility_required = any(m.get("mobility_constraints", False) for m in members)
 
-Reuse cached data for subsequent requests and only regenerate
-itineraries.
+    # ── Step 3: conflict detection — high std dev means members disagree ──
+    conflicts = []
+    for cat in categories:
+        vals = [m["preferences"].get(cat, 0) for m in members]
+        mean = sum(vals) / len(vals)
+        std  = math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
+        if std > 2.5:
+            conflicts.append(cat)
 
-7. Parallelize Independent Agents
+    age_groups = list({m.get("age_group", "adult") for m in members})
 
-Run simultaneously: - Logistics - Budget - Recommendations
+    return {
+        "must_have":          must_have,
+        "nice_to_have":       nice_to_have,
+        "avoid":              avoid,
+        "mobility_required":  mobility_required,
+        "conflicts":          conflicts,
+        "raw_scores":         dict(sorted_scores),
+        "age_groups":         age_groups,
+    }
 
-Merge results in Planner.
 
-8. Enforce a Strict Schema
+def _build_group_brief(profile: dict) -> str:
+    """
+    Formats the group profile into a concise text block for injection
+    into agent prompts. Adds explicit conflict-handling instruction when
+    preference conflicts are detected.
+    """
+    conflict_note = ""
+    if profile["conflicts"]:
+        conflict_note = (
+            f"\nCONFLICT ALERT: Members strongly disagree on "
+            f"{', '.join(profile['conflicts'])}. "
+            f"Choose activities that partially satisfy both sides — "
+            f"e.g. a light nature walk instead of extreme trekking."
+        )
 
-Use Pydantic or equivalent validation.
+    mobility_note = (
+        "YES — ALL venues must be wheelchair/senior accessible, "
+        "no steep stairs, short walking distances only."
+        if profile["mobility_required"]
+        else "no special requirements"
+    )
 
-Example fields: - name - category - location - duration - accessibility
+    return f"""
+GROUP PROFILE (pre-computed — use this, do not re-derive from raw members):
+  Must-have activities : {', '.join(profile['must_have']) or 'none'}
+  Nice-to-have         : {', '.join(profile['nice_to_have']) or 'none'}
+  Avoid entirely       : {', '.join(profile['avoid']) or 'none'}
+  Mobility required    : {mobility_note}
+  Age groups in party  : {', '.join(profile['age_groups'])}{conflict_note}
+""".strip()
 
-Reject malformed outputs.
 
-9. Limit Search Output
+# ── Task factory ───────────────────────────────────────────────────────────
 
-Search should return only required fields: - name - category -
-location - duration
+def create_tasks(trip_details: dict):
+    # ── Aggregate BEFORE any agent runs ───────────────────────────────────
+    group_profile = aggregate_group_preferences(trip_details["members"])
+    group_brief   = _build_group_brief(group_profile)
 
-Avoid long paragraphs from search results.
+    city_guide      = get_city_local_guide()
+    travel_expert   = get_travel_trip_expert()
+    planning_expert = get_travel_planning_expert()
 
-10. Separate Internal Reasoning from Final Rendering
+    destinations_str = ", ".join(trip_details["destinations"])
 
-Internal: JSON
+    # ── Task 1: research ───────────────────────────────────────────────────
+    task1 = Task(
+        description=f"""
+Research actual, specific attractions and activities in {destinations_str}.
 
-Final: Readable itinerary
+{group_brief}
 
-Do not mix reasoning with presentation.
+RULES:
+- Use EXACT real-world venue names — no generic names like "City Museum".
+- Search each destination ONCE; do not repeat the same query.
+- For CONFLICT categories ({', '.join(group_profile['conflicts']) or 'none'}):
+  suggest activities that offer a middle ground (e.g. a scenic stroll
+  satisfies both culture lovers and light-adventure seekers).
+- Output a structured JSON report so later agents can reuse it without
+  any additional searches.
+""",
+        expected_output=(
+            "A structured JSON report: for each destination, list attractions "
+            "with exact names, opening hours, entry fees, accessibility rating, "
+            "and which preference categories they satisfy."
+        ),
+        agent=city_guide,
+    )
 
-11. Modular Output
+    # ── Task 2: logistics ──────────────────────────────────────────────────
+    task2 = Task(
+        description=f"""
+Using ONLY the city report from the previous agent, plan logistics for a
+{trip_details['total_days']}-day trip.
 
-Instead of one huge object: - city_report.json - travel_plan.json -
-budget.json
+{group_brief}
 
-This improves maintainability and reduces token usage.
+Group size : {trip_details['group_size']}
+Pace       : {trip_details['pace']}
+Budget     : {trip_details['budget_per_day_INR']} INR ({trip_details['budget_type']})
 
-12. Expected Benefits
+RULES:
+- Do NOT re-search destinations already in the city report.
+- You MAY do a targeted search ONLY for transport fares or hotel prices
+  not already in the report — keep extra searches to a minimum.
+- If mobility_required is YES, prioritise ground-floor / lift-accessible
+  venues and plan for shorter walking legs (max 500m between stops).
+""",
+        expected_output=(
+            "A logistics plan: travel routes, daily pacing, transport options "
+            "with INR cost estimates, and accommodation tier recommendations."
+        ),
+        agent=travel_expert,
+        context=[task1],
+    )
 
--   Faster execution
--   Lower token consumption
--   Better scalability for large groups
--   Cleaner JSON
--   Fewer hallucinations
--   Easier debugging and validation
--   Better user experience
+    # ── Task 3: final itinerary ────────────────────────────────────────────
+    task3 = Task(
+        description=f"""
+Using ONLY the city report and logistics plan from the previous agents,
+compile the final {trip_details['total_days']}-day itinerary.
+
+{group_brief}
+
+RULES:
+- Use ONLY exact venues already identified — do NOT invent generic places.
+- Do NOT perform any web searches.
+- For each day, ensure the mix of activities reflects the group's
+  must-have priorities.
+- If any conflict categories exist, show how each day balances them.
+""",
+        expected_output=(
+            "A day-by-day itinerary with morning/afternoon/evening slots, "
+            "exact venue names, travel times between venues, and a daily "
+            "budget breakdown in INR."
+        ),
+        agent=planning_expert,
+        context=[task1, task2],
+    )
+
+    return [task1, task2, task3]
