@@ -39,6 +39,7 @@ def get_city_local_guide():
         ),
         verbose=True,
         allow_delegation=False,
+        max_iter=15,           # needs ~6+ searches before final answer
         tools=[search_tool],
         llm=get_llm(),
     )

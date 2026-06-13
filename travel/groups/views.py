@@ -142,17 +142,29 @@ def submit_preference(request, code):
     
     if request.method == 'POST':
         form = UserPreferenceForm(request.POST, instance=existing_pref)
+        category_votes_json = request.POST.get('category_votes', '{}')
+        try:
+            category_votes = json.loads(category_votes_json)
+        except:
+            category_votes = {}
+            
         if form.is_valid():
             pref = form.save(commit=False)
             pref.user = request.user
             pref.group = group
+            pref.category_votes = category_votes
             pref.save()
             messages.success(request, 'Preferences saved!')
             return redirect('group_detail', code=group.code)
     else:
         form = UserPreferenceForm(instance=existing_pref)
         
-    return render(request, 'groups/submit_preference.html', {'form': form, 'group': group})
+    initial_votes_json = json.dumps(existing_pref.category_votes) if existing_pref and existing_pref.category_votes else "{}"
+    return render(request, 'groups/submit_preference.html', {
+        'form': form, 
+        'group': group,
+        'initial_votes_json': initial_votes_json
+    })
 
 @login_required
 def plan_itinerary(request, code):
@@ -173,23 +185,23 @@ def plan_itinerary(request, code):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
     initial_members = []
-    max_days = 1
     total_budget = 0.0
     for pref in group.preferences.all():
         initial_members.append({
             'name': pref.user.username,
-            'age_group': "25-35", # Default
-            'mobility_constraints': pref.walking_limit < 5.0 if pref.walking_limit is not None else False,
-            'preferences': pref.category_votes or {
-                "nature": 5,
-                "photography": 4,
-                "history": 2
-            }
+            'age_group': pref.age_group,
+            'mobility_constraints': pref.mobility_constraints,
+            'preferences': pref.category_votes or {}
         })
-        if pref.days and pref.days > max_days:
-            max_days = pref.days
         if pref.budget:
             total_budget += float(pref.budget)
+            
+    # Calculate days from trip dates
+    max_days = 4
+    if hasattr(group, 'trip') and group.trip.start_date and group.trip.end_date:
+        max_days = (group.trip.end_date - group.trip.start_date).days + 1
+        if max_days < 1:
+            max_days = 1
             
     # Try to determine budget per day per person
     group_size = group.members.count()
@@ -206,6 +218,14 @@ def plan_itinerary(request, code):
     else:
         budget_str = "1500-3000"
         
+    hotel_name = ""
+    hotel_lat = None
+    hotel_lng = None
+    if hasattr(group, 'trip') and group.trip.hotel_name:
+        hotel_name = group.trip.hotel_name
+        hotel_lat = group.trip.hotel_lat
+        hotel_lng = group.trip.hotel_lon
+
     initial_data = {
         'destinationsInput': group.trip.destination_city if hasattr(group, 'trip') else "",
         'payload': {
@@ -213,9 +233,12 @@ def plan_itinerary(request, code):
             'total_days': max_days if max_days > 1 else 4,
             'group_size': group_size if group_size > 0 else 4,
             'pace': "moderate",
-            'budget_per_day_INR': "3000",
-            'budget_type': "mid-range",
+            'budget_per_day_INR': budget_str,
+            'budget_type': "per_person",
             'use_llm': True,
+            'hotel_name': hotel_name,
+            'hotel_lat': hotel_lat,
+            'hotel_lng': hotel_lng,
             'members': initial_members if initial_members else [
                 {
                     'name': "Host",

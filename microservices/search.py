@@ -7,10 +7,10 @@ Shared, cached DuckDuckGo search utility.
 
 import time
 import threading
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 CACHE_TTL = 600          # seconds to keep a result
-MAX_RESULTS = 5          # per query – enough context, not overload
+MAX_RESULTS = 10         # per query – enough context, not overload
 
 _cache: dict[str, tuple[str, float]] = {}   # query → (result, timestamp)
 _lock = threading.Lock()

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
 <div class="container mt-4" x-data="itineraryPlanner()">
     <h2 class="mb-4">Plan Itinerary for {{ group.name }}</h2>
@@ -125,7 +126,40 @@
                 <p><strong>Destinations:</strong> <span x-text="result?.city_report?.destinations ? result.city_report.destinations.join(', ') : ''"></span></p>
                 <div class="mb-3">
                     <strong>Attractions and Activities:</strong>
-                    <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.city_report?.attractions_and_activities"></div>
+                    <template x-if="result?.parsed_attractions">
+                        <div class="mt-2">
+                            <template x-for="(cityData, cityName) in result.parsed_attractions" :key="cityName">
+                                <div class="mb-4">
+                                    <h5 class="text-primary" x-text="cityName"></h5>
+                                    <template x-for="(places, category) in cityData" :key="category">
+                                        <div class="mb-3">
+                                            <h6 class="text-secondary border-bottom pb-1" x-text="category"></h6>
+                                            <div class="row">
+                                                <template x-for="place in places" :key="place.name">
+                                                    <div class="col-md-6 mb-2">
+                                                        <div class="card h-100 shadow-sm">
+                                                            <div class="card-body py-2">
+                                                                <h6 class="card-title mb-1" x-text="place.name"></h6>
+                                                                <p class="card-text small mb-1 text-muted" x-text="place.location"></p>
+                                                                <ul class="list-unstyled small mb-0 mt-2">
+                                                                    <li x-show="place.openingHours"><strong>Hours:</strong> <span x-text="place.openingHours"></span></li>
+                                                                    <li x-show="place.entryFee"><strong>Fee:</strong> <span x-text="place.entryFee"></span></li>
+                                                                    <li x-show="place.notes && place.notes.accessibility"><strong>Notes:</strong> <span x-text="place.notes.accessibility"></span></li>
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="!result?.parsed_attractions">
+                        <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.city_report?.attractions_and_activities"></div>
+                    </template>
                 </div>
                 <div class="mb-3">
                     <strong>Recommendations:</strong>
@@ -145,7 +179,12 @@
                 </div>
                 <div>
                     <strong>Daily Itinerary:</strong>
-                    <div class="p-3 bg-white border rounded mt-2" style="white-space: pre-wrap; font-family: monospace;" x-text="result?.travel_plan?.daily_itinerary"></div>
+                    <template x-if="result?.travel_plan?.daily_itinerary_html">
+                        <div class="p-3 bg-white border rounded mt-2" x-html="result.travel_plan.daily_itinerary_html"></div>
+                    </template>
+                    <template x-if="!result?.travel_plan?.daily_itinerary_html">
+                        <div class="p-3 bg-white border rounded mt-2" style="white-space: pre-wrap; font-family: monospace;" x-text="result?.travel_plan?.daily_itinerary"></div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -209,6 +248,26 @@
                         const data = await response.json();
 
                         if (response.ok) {
+                            if (data.city_report && data.city_report.attractions_and_activities) {
+                                let content = data.city_report.attractions_and_activities;
+                                if (typeof content === 'string') {
+                                    let match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                                    if (match) {
+                                        content = match[1].trim();
+                                    } else if (content.trim().startsWith('{')) {
+                                        content = content.trim();
+                                    }
+                                    try {
+                                        data.parsed_attractions = JSON.parse(content);
+                                    } catch (e) {
+                                        data.parsed_attractions = null;
+                                        console.error("Failed to parse attractions JSON:", e);
+                                    }
+                                }
+                            }
+                            if (data.travel_plan && data.travel_plan.daily_itinerary && typeof marked !== 'undefined') {
+                                data.travel_plan.daily_itinerary_html = marked.parse(data.travel_plan.daily_itinerary);
+                            }
                             this.result = data;
                         } else {
                             this.error = data.message || "Failed to generate itinerary. Ensure the FastAPI microservice is running.";

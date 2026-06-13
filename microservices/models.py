@@ -15,6 +15,9 @@ class TripRequest(BaseModel):
     budget_per_day_INR: str
     budget_type: str
     use_llm: bool = False
+    hotel_name: str
+    hotel_lat: float
+    hotel_lng: float
     members: List[Member]
 
 # Output schemas for the 2 JSONs

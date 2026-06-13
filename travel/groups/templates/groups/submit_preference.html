@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
-
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card shadow-sm">
@@ -9,9 +9,33 @@
                 <h4 class="mb-0">Submit Preferences - {{ group.name }}</h4>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" x-data="preferenceForm()">
                     {% csrf_token %}
                     {{ form.as_p }}
+                    
+                    <hr>
+                    <h5 class="mb-3">Interests & Preferences</h5>
+                    <p class="text-muted small">Add your interests (e.g., Nature, History, Food) and rate them out of 10.</p>
+                    
+                    <div class="mb-3">
+                        <template x-for="(pref, index) in preferences" :key="index">
+                            <div class="row mb-2 align-items-center">
+                                <div class="col-md-6">
+                                    <input type="text" class="form-control" x-model="pref.name" placeholder="Interest (e.g. Photography)" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="number" class="form-control" x-model="pref.score" min="1" max="10" placeholder="Score (1-10)" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger btn-sm" @click="removePreference(index)">X</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <button type="button" class="btn btn-outline-success btn-sm mb-3" @click="addPreference()">+ Add Preference</button>
+                    
+                    <input type="hidden" name="category_votes" :value="JSON.stringify(getCategoryVotes())">
+
                     <div class="mt-4">
                         <button type="submit" class="btn btn-primary">Save Preferences</button>
                         <a href="{% url 'group_detail' group.code %}" class="btn btn-secondary">Cancel</a>
@@ -21,4 +45,38 @@
         </div>
     </div>
 </div>
+
+<script>
+    const INITIAL_VOTES = {{ initial_votes_json|safe }};
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('preferenceForm', () => {
+            const initialVotes = INITIAL_VOTES || {};
+            const initialPrefs = [];
+            for (const [key, value] of Object.entries(initialVotes)) {
+                initialPrefs.push({name: key, score: value});
+            }
+            if (initialPrefs.length === 0) {
+                initialPrefs.push({name: '', score: 5});
+            }
+            return {
+                preferences: initialPrefs,
+                addPreference() {
+                    this.preferences.push({name: '', score: 5});
+                },
+                removePreference(index) {
+                    this.preferences.splice(index, 1);
+                },
+                getCategoryVotes() {
+                    const votes = {};
+                    this.preferences.forEach(p => {
+                        if (p.name.trim() !== '') {
+                            votes[p.name.trim()] = parseInt(p.score) || 5;
+                        }
+                    });
+                    return votes;
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}

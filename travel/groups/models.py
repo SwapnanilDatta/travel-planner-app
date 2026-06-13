@@ -41,9 +41,9 @@ class UserPreference(models.Model):
     group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, related_name='preferences')
     budget = models.DecimalField(max_digits=10, decimal_places=2)
     trip_style = models.CharField(max_length=50)
-    walking_limit = models.FloatField(help_text="In kilometers")
+    age_group = models.CharField(max_length=20, default="25-35")
+    mobility_constraints = models.BooleanField(default=False)
     category_votes = models.JSONField(default=dict)
-    days = models.IntegerField()
     embedding = models.TextField(blank=True, null=True)
 
     def __str__(self):
