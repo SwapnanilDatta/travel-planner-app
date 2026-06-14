@@ -2,43 +2,46 @@
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-<div class="row justify-content-center">
+<div class="row justify-content-center mt-4">
     <div class="col-md-8">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Submit Preferences - {{ group.name }}</h4>
-            </div>
-            <div class="card-body">
-                <form method="post" x-data="preferenceForm()">
+        <h6 class="text-uppercase text-muted-editorial letter-spacing-wide mb-2 text-center">Traveler Input</h6>
+        <h1 class="display-4 font-weight-bold mb-5 text-center" style="font-family: var(--font-heading);">Submit Preferences</h1>
+        
+        <div class="card card-editorial border-0">
+            <div class="card-body p-0">
+                <form method="post" x-data="preferenceForm()" class="editorial-form">
                     {% csrf_token %}
-                    {{ form.as_p }}
                     
-                    <hr>
-                    <h5 class="mb-3">Interests & Preferences</h5>
-                    <p class="text-muted small">Add your interests (e.g., Nature, History, Food) and rate them out of 10.</p>
+                    <div class="mb-5">
+                        {{ form.as_p }}
+                    </div>
                     
-                    <div class="mb-3">
+                    <hr class="mb-5" style="border-top: 1px solid var(--border-color);">
+                    <h3 class="mb-2" style="font-family: var(--font-heading);">Specific Interests</h3>
+                    <p class="text-muted-editorial mb-4">Add your interests (e.g., Nature, History, Food) and rate them from 1 to 10.</p>
+                    
+                    <div class="mb-4">
                         <template x-for="(pref, index) in preferences" :key="index">
-                            <div class="row mb-2 align-items-center">
-                                <div class="col-md-6">
-                                    <input type="text" class="form-control" x-model="pref.name" placeholder="Interest (e.g. Photography)" required>
+                            <div class="row mb-3 align-items-center g-2">
+                                <div class="col-md-7">
+                                    <input type="text" class="form-control border-editorial rounded-0 py-2" x-model="pref.name" placeholder="Interest (e.g. Photography)" required>
                                 </div>
-                                <div class="col-md-4">
-                                    <input type="number" class="form-control" x-model="pref.score" min="1" max="10" placeholder="Score (1-10)" required>
+                                <div class="col-md-3">
+                                    <input type="number" class="form-control border-editorial rounded-0 py-2" x-model="pref.score" min="1" max="10" placeholder="Score (1-10)" required>
                                 </div>
-                                <div class="col-md-2">
-                                    <button type="button" class="btn btn-outline-danger btn-sm" @click="removePreference(index)">X</button>
+                                <div class="col-md-2 text-end">
+                                    <button type="button" class="btn btn-outline-danger rounded-0" @click="removePreference(index)">X</button>
                                 </div>
                             </div>
                         </template>
                     </div>
-                    <button type="button" class="btn btn-outline-success btn-sm mb-3" @click="addPreference()">+ Add Preference</button>
+                    <button type="button" class="btn btn-editorial-outline btn-sm mb-5" @click="addPreference()">+ Add Preference</button>
                     
                     <input type="hidden" name="category_votes" :value="JSON.stringify(getCategoryVotes())">
 
-                    <div class="mt-4">
-                        <button type="submit" class="btn btn-primary">Save Preferences</button>
-                        <a href="{% url 'group_detail' group.code %}" class="btn btn-secondary">Cancel</a>
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-editorial px-5 py-3">Save Preferences</button>
+                        <a href="{% url 'group_detail' group.code %}" class="btn btn-editorial-outline px-4 py-3">Cancel</a>
                     </div>
                 </form>
             </div>

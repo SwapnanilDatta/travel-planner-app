@@ -10,7 +10,7 @@ import threading
 from ddgs import DDGS
 
 CACHE_TTL = 600          # seconds to keep a result
-MAX_RESULTS = 10         # per query – enough context, not overload
+MAX_RESULTS = 5          # per query – reduced to save LLM tokens
 
 _cache: dict[str, tuple[str, float]] = {}   # query → (result, timestamp)
 _lock = threading.Lock()
@@ -37,9 +37,9 @@ def cached_search(query: str) -> str:
         lines = []
         for h in hits:
             title = h.get("title", "")
-            body  = h.get("body",  "")
+            body  = h.get("body",  "")[:150] + "..." if len(h.get("body", "")) > 150 else h.get("body", "")
             href  = h.get("href",  "")
-            lines.append(f"- {title}: {body} ({href})")
+            lines.append(f"- {title}: {body}")
         result = "\n".join(lines) if lines else "No results found."
     except Exception as e:
         result = f"Search error: {e}"

@@ -1,26 +1,32 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="row">
-    <div class="col-md-8 mx-auto">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">{{ group.name }} Chat</h5>
-                <small>Code: <strong>{{ group.code }}</strong></small>
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-8">
+        <h6 class="text-uppercase text-muted-editorial letter-spacing-wide mb-2 text-center">Live Discussion</h6>
+        <h1 class="display-4 font-weight-bold mb-5 text-center" style="font-family: var(--font-heading);">{{ group.name }}</h1>
+        
+        <div class="card card-editorial border-editorial mb-5">
+            <div class="card-header bg-transparent border-bottom border-dark py-3 d-flex justify-content-between align-items-center">
+                <span class="text-uppercase small fw-bold" style="letter-spacing: 0.1em;">Message Board</span>
+                <span class="text-muted-editorial small">Code: {{ group.code }}</span>
             </div>
-            <div class="card-body chat-box" id="chat-log" style="height: 400px; overflow-y: auto; background-color: #f8f9fa;">
+            <div class="card-body chat-box" id="chat-log" style="height: 500px; overflow-y: auto; background-color: var(--surface-color);">
                 {% for message in messages_list %}
-                    <div class="mb-2">
-                        <strong>{{ message.sender.username }}:</strong> 
-                        <span>{{ message.content }}</span>
+                    <div class="mb-3">
+                        <strong class="text-uppercase small" style="letter-spacing: 0.05em; border-bottom: 1px solid var(--accent-color);">{{ message.sender.username }}</strong><br>
+                        <span class="fs-6 mt-1 d-inline-block">{{ message.content }}</span>
                     </div>
                 {% endfor %}
             </div>
-            <div class="card-footer">
+            <div class="card-footer bg-transparent border-top border-dark p-3">
                 <div class="input-group">
-                    <input type="text" id="chat-message-input" class="form-control" placeholder="Type your message here...">
-                    <button class="btn btn-primary" id="chat-message-submit" type="button">Send</button>
+                    <input type="text" id="chat-message-input" class="form-control border-editorial rounded-0 py-2" placeholder="Type your message here...">
+                    <button class="btn btn-editorial px-4" id="chat-message-submit" type="button">Send</button>
                 </div>
             </div>
+        </div>
+        <div class="text-center">
+            <a href="{% url 'group_detail' group.code %}" class="btn btn-editorial-outline">Back to Dashboard</a>
         </div>
     </div>
 </div>

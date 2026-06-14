@@ -3,190 +3,131 @@
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-<div class="container mt-4" x-data="itineraryPlanner()">
-    <h2 class="mb-4">Plan Itinerary for {{ group.name }}</h2>
+<div class="container mt-5" x-data="itineraryPlanner()">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <h6 class="text-uppercase text-muted-editorial letter-spacing-wide mb-2 text-center">Establish Route</h6>
+            <h2 class="display-4 font-weight-bold mb-5 text-center" style="font-family: var(--font-heading);">Plan Itinerary for {{ group.name }}</h2>
 
-    <div x-show="!result" class="card shadow-sm">
-        <div class="card-body">
-            <form @submit.prevent="submitForm">
-                {% csrf_token %}
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Destinations (comma-separated)</label>
-                        <input type="text" class="form-control" x-model="destinationsInput"
-                            placeholder="e.g. Delhi, Agra" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Total Days</label>
-                        <input type="number" class="form-control" x-model="payload.total_days" min="1" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Group Size</label>
-                        <input type="number" class="form-control" x-model="payload.group_size" min="1" required>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Budget Per Day (INR)</label>
-                        <select class="form-select" x-model="payload.budget_per_day_INR" required>
-                            <option value="Under 500">Under 500</option>
-                            <option value="500-1500">500-1500</option>
-                            <option value="1500-3000">1500-3000</option>
-                            <option value="3000+">3000+</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Budget Type</label>
-                        <select class="form-select" x-model="payload.budget_type" required>
-                            <option value="per_person">Per Person</option>
-                            <option value="per_group">Per Group</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 d-flex align-items-end">
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" x-model="payload.use_llm" id="useLlm">
-                            <label class="form-check-label" for="useLlm">
-                                Use LLM Enhancement
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <hr>
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h4>Members</h4>
-                    <button type="button" class="btn btn-sm btn-outline-primary" @click="addMember">Add Member</button>
-                </div>
-
-                <template x-for="(member, index) in payload.members" :key="index">
-                    <div class="card mb-3 bg-light">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <h5>Member <span x-text="index + 1"></span></h5>
-                                <button type="button" class="btn btn-sm btn-outline-danger" @click="removeMember(index)"
-                                    x-show="payload.members.length > 1">Remove</button>
+            <div x-show="!result" class="card card-editorial border-0">
+                <div class="card-body p-0">
+                    <form @submit.prevent="submitForm" class="editorial-form">
+                        {% csrf_token %}
+                        <div class="row mb-4 g-4">
+                            <div class="col-md-6">
+                                <label class="form-label text-uppercase small text-muted-editorial">Destinations (comma-separated)</label>
+                                <input type="text" class="form-control border-editorial rounded-0 py-2" x-model="destinationsInput"
+                                    placeholder="e.g. Delhi, Agra" required>
                             </div>
-                            <div class="row mb-2">
-                                <div class="col-md-4">
-                                    <label class="form-label">Name</label>
-                                    <input type="text" class="form-control" x-model="member.name" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Age Group (e.g. 25-35)</label>
-                                    <input type="text" class="form-control" x-model="member.age_group" required>
-                                </div>
-                                <div class="col-md-4 d-flex align-items-end">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox"
-                                            x-model="member.mobility_constraints">
-                                        <label class="form-check-label">Mobility Constraints</label>
-                                    </div>
-                                </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-uppercase small text-muted-editorial">Total Days</label>
+                                <input type="number" class="form-control border-editorial rounded-0 py-2" x-model="payload.total_days" min="1" required>
                             </div>
-
-                            <h6>Preferences (Rating 1-5)</h6>
-                            <div class="row">
-                                <template x-for="(rating, category) in member.preferences" :key="category">
-                                    <div class="col-md-4 mb-2">
-                                        <label class="form-label text-sm" x-text="category"></label>
-                                        <input type="number" class="form-control form-control-sm"
-                                            x-model.number="member.preferences[category]" min="1" max="5">
-                                    </div>
-                                </template>
+                            <div class="col-md-3">
+                                <label class="form-label text-uppercase small text-muted-editorial">Group Size</label>
+                                <input type="number" class="form-control border-editorial rounded-0 py-2" x-model="payload.group_size" min="1" required>
                             </div>
                         </div>
-                    </div>
-                </template>
 
-                <div class="d-grid mt-4">
-                    <button type="submit" class="btn btn-success btn-lg" :disabled="loading">
-                        <span x-show="!loading">Generate Itinerary</span>
-                        <span x-show="loading">Generating... This may take a while.</span>
-                    </button>
+                        <div class="row mb-5 g-4">
+                            <div class="col-md-4">
+                                <label class="form-label text-uppercase small text-muted-editorial">Budget Per Day (INR)</label>
+                                <select class="form-select border-editorial rounded-0 py-2" x-model="payload.budget_per_day_INR" required>
+                                    <option value="Under 500">Under 500</option>
+                                    <option value="500-1500">500-1500</option>
+                                    <option value="1500-3000">1500-3000</option>
+                                    <option value="3000+">3000+</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-uppercase small text-muted-editorial">Budget Type</label>
+                                <select class="form-select border-editorial rounded-0 py-2" x-model="payload.budget_type" required>
+                                    <option value="per_person">Per Person</option>
+                                    <option value="per_group">Per Group</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input rounded-0 border-dark" type="checkbox" x-model="payload.use_llm" id="useLlm">
+                                    <label class="form-check-label text-uppercase small" for="useLlm">
+                                        Use LLM Enhancement
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="mb-5" style="border-top: 1px solid var(--border-color);">
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h3 style="font-family: var(--font-heading);">Travelers Overview</h3>
+                            <button type="button" class="btn btn-sm btn-editorial-outline" @click="addMember">+ Add Traveler</button>
+                        </div>
+
+                        <div class="row g-4">
+                            <template x-for="(member, index) in payload.members" :key="index">
+                                <div class="col-md-12">
+                                    <div class="card card-editorial border-editorial mb-0">
+                                        <div class="card-body p-4">
+                                            <div class="d-flex justify-content-between align-items-center mb-4" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                                                <h5 class="mb-0" style="font-family: var(--font-heading);">Traveler <span x-text="index + 1"></span></h5>
+                                                <button type="button" class="btn btn-sm btn-outline-danger rounded-0" @click="removeMember(index)"
+                                                    x-show="payload.members.length > 1">Remove</button>
+                                            </div>
+                                            <div class="row mb-4 g-3">
+                                                <div class="col-md-4">
+                                                    <label class="form-label text-uppercase small text-muted-editorial">Name</label>
+                                                    <input type="text" class="form-control border-editorial rounded-0 py-2" x-model="member.name" required>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label text-uppercase small text-muted-editorial">Age Group</label>
+                                                    <input type="text" class="form-control border-editorial rounded-0 py-2" x-model="member.age_group" placeholder="e.g. 25-35" required>
+                                                </div>
+                                                <div class="col-md-4 d-flex align-items-end">
+                                                    <div class="form-check mb-2">
+                                                        <input class="form-check-input rounded-0 border-dark" type="checkbox"
+                                                            x-model="member.mobility_constraints">
+                                                        <label class="form-check-label text-uppercase small">Mobility Issues</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <h6 class="text-uppercase small text-muted-editorial mb-3">Preferences (1-5)</h6>
+                                            <div class="row g-2">
+                                                <template x-for="(rating, category) in member.preferences" :key="category">
+                                                    <div class="col-md-4 mb-2">
+                                                        <label class="form-label text-uppercase small mb-1" x-text="category"></label>
+                                                        <input type="number" class="form-control border-editorial rounded-0 py-1"
+                                                            x-model.number="member.preferences[category]" min="1" max="5">
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="d-grid mt-5">
+                            <button type="submit" class="btn btn-editorial btn-lg py-3" :disabled="loading">
+                                <span x-show="!loading" style="letter-spacing: 0.1em;">Generate Itinerary</span>
+                                <span x-show="loading" style="letter-spacing: 0.1em;">Generating... Please Wait.</span>
+                            </button>
+                        </div>
+
+                        <div x-show="error" class="alert alert-danger mt-4 rounded-0" x-text="error"></div>
+                    </form>
                 </div>
-
-                <div x-show="error" class="alert alert-danger mt-3" x-text="error"></div>
-            </form>
+            </div>
         </div>
     </div>
 
     <!-- Results Section -->
     <div x-show="result" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>Generated Itinerary</h3>
-            <button class="btn btn-outline-secondary btn-sm" @click="result = null">Back to Form</button>
+            <h3>Generating Itinerary...</h3>
         </div>
-
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">City Report</h5>
-            </div>
-            <div class="card-body" x-show="result && result.city_report">
-                <p><strong>Destinations:</strong> <span x-text="result?.city_report?.destinations ? result.city_report.destinations.join(', ') : ''"></span></p>
-                <div class="mb-3">
-                    <strong>Attractions and Activities:</strong>
-                    <template x-if="result?.parsed_attractions">
-                        <div class="mt-2">
-                            <template x-for="(cityData, cityName) in result.parsed_attractions" :key="cityName">
-                                <div class="mb-4">
-                                    <h5 class="text-primary" x-text="cityName"></h5>
-                                    <template x-for="(places, category) in cityData" :key="category">
-                                        <div class="mb-3">
-                                            <h6 class="text-secondary border-bottom pb-1" x-text="category"></h6>
-                                            <div class="row">
-                                                <template x-for="place in places" :key="place.name">
-                                                    <div class="col-md-6 mb-2">
-                                                        <div class="card h-100 shadow-sm">
-                                                            <div class="card-body py-2">
-                                                                <h6 class="card-title mb-1" x-text="place.name"></h6>
-                                                                <p class="card-text small mb-1 text-muted" x-text="place.location"></p>
-                                                                <ul class="list-unstyled small mb-0 mt-2">
-                                                                    <li x-show="place.openingHours"><strong>Hours:</strong> <span x-text="place.openingHours"></span></li>
-                                                                    <li x-show="place.entryFee"><strong>Fee:</strong> <span x-text="place.entryFee"></span></li>
-                                                                    <li x-show="place.notes && place.notes.accessibility"><strong>Notes:</strong> <span x-text="place.notes.accessibility"></span></li>
-                                                                </ul>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-                    <template x-if="!result?.parsed_attractions">
-                        <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.city_report?.attractions_and_activities"></div>
-                    </template>
-                </div>
-                <div class="mb-3">
-                    <strong>Recommendations:</strong>
-                    <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.city_report?.recommendations"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0">Travel Plan</h5>
-            </div>
-            <div class="card-body" x-show="result && result.travel_plan">
-                <div class="mb-4">
-                    <strong>Overall Plan:</strong>
-                    <div class="p-3 bg-light border rounded mt-2" style="white-space: pre-wrap;" x-text="result?.travel_plan?.overall_plan"></div>
-                </div>
-                <div>
-                    <strong>Daily Itinerary:</strong>
-                    <template x-if="result?.travel_plan?.daily_itinerary_html">
-                        <div class="p-3 bg-white border rounded mt-2" x-html="result.travel_plan.daily_itinerary_html"></div>
-                    </template>
-                    <template x-if="!result?.travel_plan?.daily_itinerary_html">
-                        <div class="p-3 bg-white border rounded mt-2" style="white-space: pre-wrap; font-family: monospace;" x-text="result?.travel_plan?.daily_itinerary"></div>
-                    </template>
-                </div>
-            </div>
+        <div class="alert alert-info">
+            Your itinerary has been generated and is being saved. You will be redirected shortly.
         </div>
     </div>
 </div>
@@ -248,27 +189,24 @@
                         const data = await response.json();
 
                         if (response.ok) {
-                            if (data.city_report && data.city_report.attractions_and_activities) {
-                                let content = data.city_report.attractions_and_activities;
-                                if (typeof content === 'string') {
-                                    let match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-                                    if (match) {
-                                        content = match[1].trim();
-                                    } else if (content.trim().startsWith('{')) {
-                                        content = content.trim();
-                                    }
-                                    try {
-                                        data.parsed_attractions = JSON.parse(content);
-                                    } catch (e) {
-                                        data.parsed_attractions = null;
-                                        console.error("Failed to parse attractions JSON:", e);
-                                    }
-                                }
-                            }
-                            if (data.travel_plan && data.travel_plan.daily_itinerary && typeof marked !== 'undefined') {
-                                data.travel_plan.daily_itinerary_html = marked.parse(data.travel_plan.daily_itinerary);
-                            }
                             this.result = data;
+                            // Auto-save the generated itinerary
+                            const saveResponse = await fetch("{% url 'save_itinerary' group.code %}", {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                                },
+                                body: JSON.stringify({
+                                    daily_itinerary: data.travel_plan.daily_itinerary
+                                })
+                            });
+                            const saveData = await saveResponse.json();
+                            if (saveResponse.ok) {
+                                window.location.href = saveData.redirect_url;
+                            } else {
+                                this.error = "Failed to save itinerary: " + (saveData.message || "Unknown error");
+                            }
                         } else {
                             this.error = data.message || "Failed to generate itinerary. Ensure the FastAPI microservice is running.";
                         }

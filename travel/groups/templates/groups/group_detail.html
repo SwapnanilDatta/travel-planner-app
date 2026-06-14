@@ -1,98 +1,115 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-8">
-        <h2>{{ group.name }} Dashboard</h2>
-        <p class="text-muted">Invite Code: <strong>{{ group.code }}</strong></p>
+<div class="row mb-5 align-items-end">
+    <div class="col-md-7">
+        <h6 class="text-uppercase text-muted-editorial letter-spacing-wide mb-2">Group Dashboard</h6>
+        <h1 class="display-3 font-weight-bold" style="font-family: var(--font-heading);">{{ group.name }}</h1>
+        <p class="text-muted-editorial fs-5 mb-0 mt-3">Invite Code: <strong class="text-primary-editorial border-bottom border-dark">{{ group.code }}</strong></p>
     </div>
-    <div class="col-md-4 text-end">
-        <a href="{% url 'chat_room' group.code %}" class="btn btn-outline-primary mb-1">Chat</a>
+    <div class="col-md-5 text-md-end mt-4 mt-md-0 d-flex flex-wrap justify-content-md-end gap-2">
+        <a href="{% url 'chat_room' group.code %}" class="btn btn-editorial-outline">Discussion</a>
+        {% if has_itinerary %}
+        <a href="{% url 'view_itinerary' group.code %}" class="btn btn-editorial">The Itinerary</a>
+        {% endif %}
         {% if is_host %}
-        <a href="{% url 'plan_itinerary' group.code %}" class="btn btn-outline-success mb-1">Plan Itinerary</a>
+        <a href="{% url 'plan_itinerary' group.code %}" class="btn btn-editorial-outline">Plan Trip</a>
         {% endif %}
         {% if is_host and not group.is_locked %}
         <form action="{% url 'lock_group' group.code %}" method="post" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger mb-1">Lock Group</button>
+            <button type="submit" class="btn btn-dark" style="border-radius: 0;">Lock Group</button>
         </form>
         {% endif %}
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">Group Details</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Status:</strong> {% if group.is_locked %}<span class="badge bg-danger">Locked</span>{% else %}<span class="badge bg-success">Open</span>{% endif %}</p>
-                <p><strong>Host:</strong> {{ group.creator.username }}</p>
-                <p><strong>Members:</strong> {{ group.members.count }}</p>
-                <ul>
-                    {% for member in group.members.all %}
-                    <li>{{ member.username }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
+<hr class="mb-5" style="border-top: 2px solid var(--accent-color);">
+
+<div class="row g-5">
+    <!-- Group Members Section -->
+    <div class="col-lg-4 col-md-6">
+        <h4 class="mb-4" style="font-family: var(--font-heading); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">The Travelers</h4>
+        <div class="mb-4">
+            <span class="text-uppercase small text-muted-editorial">Status</span><br>
+            {% if group.is_locked %}
+            <span class="badge bg-dark rounded-0 px-3 py-2 mt-1">Locked</span>
+            {% else %}
+            <span class="badge bg-light text-dark border border-dark rounded-0 px-3 py-2 mt-1">Open for members</span>
+            {% endif %}
         </div>
+        
+        <p class="mb-2"><span class="text-uppercase small text-muted-editorial">Host</span><br>
+        <strong>{{ group.creator.username }}</strong></p>
+        
+        <p class="mb-3 mt-4"><span class="text-uppercase small text-muted-editorial">Members ({{ group.members.count }})</span></p>
+        <ul class="list-unstyled">
+            {% for member in group.members.all %}
+            <li class="py-2 border-bottom" style="border-color: var(--border-color) !important;">{{ member.username }}</li>
+            {% endfor %}
+        </ul>
     </div>
     
-    <div class="col-md-6 mb-4">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">Trip Details</h5>
-            </div>
-            <div class="card-body">
-                {% if trip %}
-                <p><strong>Destination:</strong> {{ trip.destination_city }} 
-                   {% if trip.destination_lat %}<small class="text-muted">(Lat: {{ trip.destination_lat|floatformat:4 }}, Lon: {{ trip.destination_lon|floatformat:4 }})</small>{% endif %}
-                </p>
-                <p><strong>Dates:</strong> {{ trip.start_date }} to {{ trip.end_date }}</p>
-                {% if trip.hotel_name %}
-                <p><strong>Hotel:</strong> {{ trip.hotel_name }}
-                   {% if trip.hotel_lat %}<small class="text-muted">(Lat: {{ trip.hotel_lat|floatformat:4 }}, Lon: {{ trip.hotel_lon|floatformat:4 }})</small>{% endif %}
-                </p>
-                {% endif %}
-                {% else %}
-                <p class="text-muted">No trip created yet.</p>
-                {% if is_host and group.is_locked %}
-                <a href="{% url 'create_trip' group.code %}" class="btn btn-primary">Create Trip</a>
-                {% elif is_host %}
-                <p class="text-warning small">You must lock the group before creating a trip.</p>
-                {% endif %}
-                {% endif %}
-            </div>
+    <!-- Trip Details Section -->
+    <div class="col-lg-4 col-md-6">
+        <h4 class="mb-4" style="font-family: var(--font-heading); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Destinations</h4>
+        {% if trip %}
+        <div class="mb-4">
+            <span class="text-uppercase small text-muted-editorial">Locations</span>
+            <p class="fs-5 mt-1">{{ trip.destination_city }}</p>
         </div>
+        <div class="mb-4">
+            <span class="text-uppercase small text-muted-editorial">Dates</span>
+            <p class="fs-5 mt-1">{{ trip.start_date }} <span class="text-muted-editorial mx-2">&mdash;</span> {{ trip.end_date }}</p>
+        </div>
+        {% if trip.hotel_name %}
+        <div class="mb-4">
+            <span class="text-uppercase small text-muted-editorial">Accommodation</span>
+            <p class="fs-5 mt-1">{{ trip.hotel_name }}</p>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="py-4 text-center border-editorial mt-2">
+            <p class="text-muted-editorial mb-0">No trip details finalized.</p>
+        </div>
+        <div class="mt-4">
+            {% if is_host and group.is_locked %}
+            <a href="{% url 'create_trip' group.code %}" class="btn btn-editorial w-100">Establish Route</a>
+            {% elif is_host %}
+            <p class="text-muted-editorial small fst-italic">Group must be locked to establish the route.</p>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
     
-    <div class="col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Preferences</h5>
-                {% if group.is_locked %}
-                <a href="{% url 'submit_preference' group.code %}" class="btn btn-sm btn-primary">
-                    {% if has_submitted_preference %}Update Preferences{% else %}Submit Preferences{% endif %}
-                </a>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                {% if not group.is_locked %}
-                <p class="text-muted">Preferences can only be submitted after the group is locked.</p>
-                {% else %}
-                <ul class="list-group">
-                    {% for pref in group.preferences.all %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ pref.user.username }}
-                        <span class="badge bg-success rounded-pill">Submitted</span>
-                    </li>
-                    {% empty %}
-                    <li class="list-group-item text-muted">No members have submitted preferences yet.</li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-            </div>
+    <!-- Preferences Section -->
+    <div class="col-lg-4 col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+            <h4 class="mb-0" style="font-family: var(--font-heading);">Preferences</h4>
+            {% if group.is_locked %}
+            <a href="{% url 'submit_preference' group.code %}" class="btn btn-editorial-outline btn-sm">
+                {% if has_submitted_preference %}Update{% else %}Submit{% endif %}
+            </a>
+            {% endif %}
         </div>
+        
+        {% if not group.is_locked %}
+        <div class="py-4 text-center border-editorial">
+            <p class="text-muted-editorial mb-0 small">Preferences unlock when group is finalized.</p>
+        </div>
+        {% else %}
+        <ul class="list-group list-group-editorial">
+            {% for pref in group.preferences.all %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ pref.user.username }}</span>
+                <span class="small text-uppercase" style="letter-spacing: 0.05em; border-bottom: 1px solid var(--accent-color);">Submitted</span>
+            </li>
+            {% empty %}
+            <li class="list-group-item text-muted-editorial fst-italic text-center py-4 border-editorial">
+                Pending submissions from travelers.
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

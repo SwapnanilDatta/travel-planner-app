@@ -48,3 +48,24 @@ class UserPreference(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.group.name}"
+
+class Itinerary(models.Model):
+    trip = models.OneToOneField(Trip, on_delete=models.CASCADE, related_name='itinerary')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Itinerary for {self.trip}"
+
+class DailyPlan(models.Model):
+    itinerary = models.ForeignKey(Itinerary, on_delete=models.CASCADE, related_name='daily_plans')
+    day_number = models.IntegerField()
+    content = models.TextField()
+
+    class Meta:
+        ordering = ['day_number']
+        unique_together = ('itinerary', 'day_number')
+
+    def __str__(self):
+        return f"Day {self.day_number} of {self.itinerary.trip}"
+

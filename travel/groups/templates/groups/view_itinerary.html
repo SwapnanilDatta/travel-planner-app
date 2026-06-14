@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<!-- Add some custom CSS for a beautiful timeline / itinerary theme -->
+<style>
+<style>
+    .itinerary-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    .day-card {
+        border: 1px solid var(--border-color);
+        border-radius: 0;
+        margin-bottom: 4rem;
+        background-color: var(--surface-color);
+    }
+    .day-header {
+        border-bottom: 2px solid var(--accent-color);
+        padding: 1.5rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: transparent;
+        color: var(--text-primary);
+    }
+    .day-header h3 {
+        margin: 0;
+        font-family: var(--font-heading);
+        font-weight: 700;
+        font-size: 2rem;
+    }
+    .day-body {
+        padding: 2rem;
+    }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+        font-family: var(--font-heading);
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+    }
+    .markdown-content p {
+        color: var(--text-secondary);
+        line-height: 1.8;
+        font-size: 1.05rem;
+    }
+    .markdown-content ul, .markdown-content ol {
+        color: var(--text-secondary);
+        padding-left: 1.5rem;
+    }
+    .markdown-content li {
+        margin-bottom: 0.75rem;
+    }
+    .edit-textarea {
+        width: 100%;
+        min-height: 300px;
+        border: 1px solid var(--accent-color);
+        border-radius: 0;
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.95rem;
+        background-color: #fafafa;
+    }
+    .edit-textarea:focus {
+        outline: none;
+        box-shadow: none;
+        background-color: #fff;
+    }
+    .loader {
+        border: 2px solid #e0e0e0;
+        border-radius: 50%;
+        border-top: 2px solid var(--accent-color);
+        width: 16px;
+        height: 16px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 8px;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+
+<div class="itinerary-container" x-data="itineraryManager()">
+    <div class="text-center mb-5 pb-4" style="border-bottom: 1px solid var(--border-color);">
+        <h6 class="text-uppercase text-muted-editorial letter-spacing-wide mb-2">The Journey</h6>
+        <h1 class="display-3 font-weight-bold mb-4" style="font-family: var(--font-heading);">Itinerary for {{ group.name }}</h1>
+        <a href="{% url 'group_detail' group.code %}" class="btn btn-editorial-outline">Back to Dashboard</a>
+    </div>
+
+    {% for plan in daily_plans %}
+    <div class="day-card" x-data="dayManager({{ plan.day_number }}, `{{ plan.content|escapejs }}`)">
+        <div class="day-header">
+            <h3>Day {{ plan.day_number }}</h3>
+            {% if is_host %}
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-editorial-outline" @click="toggleEdit()">
+                    <span x-show="!isEditing">Edit Text</span>
+                    <span x-show="isEditing">Cancel</span>
+                </button>
+                <button class="btn btn-sm btn-editorial" @click="regenerateDay()" :disabled="isRegenerating">
+                    <span x-show="!isRegenerating">Regenerate AI</span>
+                    <span x-show="isRegenerating"><div class="loader"></div>Regenerating</span>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="day-body">
+            <!-- Display Mode -->
+            <div x-show="!isEditing" class="markdown-content" x-html="renderMarkdown(content)"></div>
+            
+            <!-- Edit Mode -->
+            <div x-show="isEditing" style="display: none;">
+                <textarea class="edit-textarea mb-3" x-model="editContent"></textarea>
+                <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-secondary" @click="toggleEdit()">Cancel</button>
+                    <button class="btn btn-success" @click="saveEdit()" :disabled="isSaving">
+                        <span x-show="!isSaving">Save Changes</span>
+                        <span x-show="isSaving">Saving...</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Alerts -->
+            <div x-show="errorMsg" class="alert alert-danger mt-3" x-text="errorMsg" style="display: none;"></div>
+            <div x-show="successMsg" class="alert alert-success mt-3" x-text="successMsg" style="display: none;"></div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-info text-center py-5">
+        <h4>No itinerary generated yet.</h4>
+        <p class="mb-0">Go back to the group and click "Plan Itinerary" to generate one.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('itineraryManager', () => ({
+            // Manager level data if needed
+        }));
+
+        Alpine.data('dayManager', (dayNumber, initialContent) => ({
+            dayNumber: dayNumber,
+            content: initialContent,
+            editContent: initialContent,
+            isEditing: false,
+            isSaving: false,
+            isRegenerating: false,
+            errorMsg: '',
+            successMsg: '',
+            
+            renderMarkdown(text) {
+                if (typeof marked !== 'undefined') {
+                    return marked.parse(text);
+                }
+                return text;
+            },
+            
+            toggleEdit() {
+                this.isEditing = !this.isEditing;
+                if (this.isEditing) {
+                    this.editContent = this.content;
+                }
+                this.errorMsg = '';
+                this.successMsg = '';
+            },
+            
+            async saveEdit() {
+                this.isSaving = true;
+                this.errorMsg = '';
+                this.successMsg = '';
+                
+                try {
+                    const response = await fetch(`/group/{{ group.code }}/itinerary/day/${this.dayNumber}/update/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({ content: this.editContent })
+                    });
+                    
+                    if (response.ok) {
+                        this.content = this.editContent;
+                        this.isEditing = false;
+                        this.successMsg = 'Changes saved successfully!';
+                        setTimeout(() => this.successMsg = '', 3000);
+                    } else {
+                        const data = await response.json();
+                        this.errorMsg = data.message || 'Failed to save changes.';
+                    }
+                } catch (e) {
+                    this.errorMsg = 'Network error occurred.';
+                } finally {
+                    this.isSaving = false;
+                }
+            },
+            
+            async regenerateDay() {
+                if(!confirm(`Are you sure you want the AI to regenerate Day ${this.dayNumber}? This will overwrite the current plan for this day.`)) return;
+                
+                this.isRegenerating = true;
+                this.errorMsg = '';
+                this.successMsg = '';
+                
+                try {
+                    const response = await fetch(`/group/{{ group.code }}/itinerary/day/${this.dayNumber}/regenerate/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({}) 
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.status === 'success') {
+                        this.content = data.content;
+                        this.editContent = data.content;
+                        this.successMsg = 'Day regenerated successfully!';
+                        setTimeout(() => this.successMsg = '', 3000);
+                    } else {
+                        this.errorMsg = data.message || 'Failed to regenerate day.';
+                    }
+                } catch (e) {
+                    this.errorMsg = 'Network error occurred while communicating with the AI.';
+                } finally {
+                    this.isRegenerating = false;
+                }
+            }
+        }));
+    });
+</script>
+{% endblock %}

@@ -1,20 +1,23 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm mt-5">
-            <div class="card-body">
-                <h3 class="card-title text-center mb-4">Register</h3>
-                <form method="POST">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <button class="btn btn-success w-100" type="submit">Sign Up</button>
-                </form>
-                <div class="mt-3 text-center">
-                    <small class="text-muted">Already have an account? <a href="{% url 'login' %}">Log In</a></small>
-                </div>
+<div class="row g-0 align-items-center mt-5 card-editorial border-0">
+    <div class="col-md-6 p-5 order-2 order-md-1">
+        <div class="px-md-5">
+            <h1 class="mb-2" style="font-family: var(--font-heading); font-size: 3rem;">Join Us</h1>
+            <p class="text-muted-editorial mb-5">Create an account to start planning your next journey.</p>
+            
+            <form method="POST" class="editorial-form">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button class="btn btn-editorial w-100 mt-4 py-3" type="submit">Create Account</button>
+            </form>
+            <div class="mt-5 text-center">
+                <p class="text-muted-editorial small">Already have an account? <a href="{% url 'login' %}" class="text-primary-editorial fw-bold text-decoration-none">Sign In</a></p>
             </div>
         </div>
+    </div>
+    <div class="col-md-6 d-none d-md-block order-1 order-md-2">
+        <img src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80" alt="Travel" class="img-fluid w-100" style="object-fit: cover; height: 600px;">
     </div>
 </div>
 {% endblock %}

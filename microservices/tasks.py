@@ -46,8 +46,8 @@ def create_tasks(trip_details: dict):
     hotel_str  = f"{hotel_name} (lat={hotel_lat}, lng={hotel_lng})"
 
     total_days = trip_details['total_days']
-    min_items  = total_days * 3
-    max_items  = total_days * 4
+    min_items  = total_days * 2
+    max_items  = total_days * 3
 
     # ── Task 1: research – does ALL searching here ─────────────────────────
     task1 = Task(
@@ -63,51 +63,19 @@ Research actual, specific attractions and activities that, TOGETHER, cover
 the range of interests above (e.g. if one member rates "photography" high
 and another rates "history" high, include options for both).
 
-CRITICAL — SEARCH STRATEGY: A single generic search will NOT return enough
-data for a {total_days}-day trip. You MUST run SEPARATE searches for EACH of
+CRITICAL — SEARCH STRATEGY: You MUST run SEPARATE searches for EACH of
 the following categories before writing your final answer (do not skip any):
-  1. "top tourist attractions in {destinations_str}"
-  2. "best museums and monuments in {destinations_str}"
-  3. "best restaurants and cafes in {destinations_str}"
-  4. "famous markets and shopping areas in {destinations_str}"
-  5. "things to do near {hotel_name}, {destinations_str}"
-  6. At least ONE more search tailored to the group's highest-rated
-     preference (e.g. "best photography spots in {destinations_str}" if
-     photography is a top preference)
-
-CRITICAL: Since this is a {total_days}-day trip, you MUST find and list enough
-UNIQUE attractions, restaurants, and activities to fill morning, afternoon, and
-evening slots for EVERY day of the trip (roughly {min_items} to {max_items} items).
-If after all the searches above you STILL have fewer than {min_items} unique
-items, run 1-2 additional searches with different phrasing (e.g. "hidden
-gems in {destinations_str}", "best parks and gardens in {destinations_str}")
-until you have enough.
+  1. "top attractions in {destinations_str}"
+  2. "best restaurants in {destinations_str}"
+  3. "things to do near {hotel_name}, {destinations_str}"
 
 CRITICAL:
-- Do NOT use generic names like "City Museum", "National Park", "local
-  market", or "a wheelchair-accessible restaurant". Use EXACT, real-world,
-  verifiable names of places (museums, monuments, restaurants, markets,
-  parks, etc.) as found via search.
-- Mobility constraints in the group: {any_mobility_constraints}. Only
-  factor in accessibility notes if this is True — do NOT invent mobility
-  constraints that aren't in the data above.
-- The group is ALREADY STAYING at: {hotel_str}. Do NOT research, suggest,
-  rate, or mention any other hotels or accommodations. Accommodation is
-  fixed and out of scope for this report.
-- When relevant, prefer attractions that are reasonably reachable from the
-  above hotel location.
-- Each numbered search above is a DIFFERENT query — do not repeat the same
-  query twice.
-- Output a single structured JSON report listing ALL items found (aim for
-  {min_items}-{max_items} unique entries total) so the next agents can reuse
-  it without any additional searches.
+- Keep the output extremely CONCISE to save tokens. Do not write long paragraphs.
+- Output a single structured JSON report listing AT LEAST {min_items} items found.
 """,
         expected_output=(
-            f"A structured JSON report containing for each destination: "
-            f"name, a list of AT LEAST {min_items} top attractions/restaurants/"
-            f"activities/markets with EXACT real-world names, opening hours, "
-            f"entry fees, which group member preference(s) each option serves, "
-            f"and notes on accessibility/mobility (only if relevant to this group)."
+            f"A concise JSON report listing AT LEAST {min_items} items with real names, "
+            f"member preference mapping, and mobility notes (if relevant)."
         ),
         agent=city_guide,
     )
@@ -134,9 +102,7 @@ member just because it doesn't suit another — instead, sequence/pair
 activities so everyone's top interests are covered across the trip).
 
 You MUST organize ALL items from the city report into a day-by-day grouping
-covering all {total_days} days (morning/afternoon/evening each) — do not
-discard items as "extra"; if there are more items than slots, group nearby
-ones together per day.
+covering all {total_days} days. Be concise to save tokens.
 
 You MAY do a targeted search ONLY for transport fares or hotel-to-attraction
 travel times that are not in the city report. Keep additional searches to a
@@ -191,3 +157,31 @@ CRITICAL:
     )
 
     return [task1, task2, task3]
+
+def create_regenerate_task(trip_details: dict, target_day_number: int, existing_itinerary: str):
+    planning_expert = get_travel_planning_expert()
+
+    destinations_str = ", ".join(trip_details["destinations"])
+    total_days = trip_details['total_days']
+
+    task = Task(
+        description=f"""
+You are given an existing {total_days}-day group trip itinerary to {destinations_str}.
+Your task is to REWRITE ONLY Day {target_day_number} of this itinerary.
+
+Existing Itinerary Context (Do NOT change other days):
+{existing_itinerary}
+
+CRITICAL INSTRUCTIONS:
+- You must rewrite Day {target_day_number} to provide alternative attractions and activities that fit the same destination and group constraints.
+- Do NOT repeat any attractions or activities that are already planned on the OTHER days.
+- Ensure the pacing and logistics still make sense.
+- Keep the output format exactly as a Day block (e.g. "### Day {target_day_number}: ...").
+- ONLY output the content for Day {target_day_number}. Do not output the rest of the itinerary.
+""",
+        expected_output=(
+            f"A completely revised plan for Day {target_day_number} with morning/afternoon/evening slots."
+        ),
+        agent=planning_expert,
+    )
+    return task

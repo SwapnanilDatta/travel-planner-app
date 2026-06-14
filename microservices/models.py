@@ -31,5 +31,9 @@ class TravelPlanOutput(BaseModel):
     daily_itinerary: str
 
 class TripResponse(BaseModel):
-    city_report: CityReportOutput
     travel_plan: TravelPlanOutput
+
+class RegenerateDayRequest(BaseModel):
+    trip_details: TripRequest
+    target_day_number: int
+    existing_itinerary: str
