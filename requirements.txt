@@ -3,3 +3,5 @@ channels
 daphne
 requests
 python-dotenv
+sentence-transformers
+pillow
