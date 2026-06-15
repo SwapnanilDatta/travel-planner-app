@@ -63,3 +63,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         user = User.objects.get(id=user_id)
         group = ChatGroup.objects.get(code=group_code)
         Message.objects.create(sender=user, group=group, content=content)
+
+    async def chat_image_message(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'image_message',
+            'image_url': event['image_url'],
+            'thumbnail_url': event['thumbnail_url'],
+            'sender': event['sender'],
+            'message_id': event['message_id'],
+            'uploaded_at': event['uploaded_at'],
+        }))

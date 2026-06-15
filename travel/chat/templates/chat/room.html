@@ -8,7 +8,12 @@
         <div class="card card-editorial border-editorial mb-5">
             <div class="card-header bg-transparent border-bottom border-dark py-3 d-flex justify-content-between align-items-center">
                 <span class="text-uppercase small fw-bold" style="letter-spacing: 0.1em;">Message Board</span>
-                <span class="text-muted-editorial small">Code: {{ group.code }}</span>
+                <div>
+                    <button type="button" class="btn btn-sm btn-editorial-outline me-2" data-bs-toggle="modal" data-bs-target="#galleryModal">
+                        Gallery & Search
+                    </button>
+                    <span class="text-muted-editorial small">Code: {{ group.code }}</span>
+                </div>
             </div>
             <div class="card-body chat-box" id="chat-log" style="height: 500px; overflow-y: auto; background-color: var(--surface-color);">
                 {% for message in messages_list %}
@@ -20,6 +25,13 @@
             </div>
             <div class="card-footer bg-transparent border-top border-dark p-3">
                 <div class="input-group">
+                    <label class="btn btn-editorial-outline d-flex align-items-center justify-content-center px-3 mb-0" style="cursor: pointer;" title="Upload Photo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-image" viewBox="0 0 16 16">
+                            <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+                            <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
+                        </svg>
+                        <input type="file" id="chat-image-input" accept="image/jpeg, image/png, image/webp" hidden>
+                    </label>
                     <input type="text" id="chat-message-input" class="form-control border-editorial rounded-0 py-2" placeholder="Type your message here...">
                     <button class="btn btn-editorial px-4" id="chat-message-submit" type="button">Send</button>
                 </div>
@@ -30,6 +42,28 @@
         </div>
     </div>
 </div>
+
+<!-- Gallery Modal -->
+<div class="modal fade" id="galleryModal" tabindex="-1" aria-labelledby="galleryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-editorial rounded-0">
+      <div class="modal-header border-bottom border-dark">
+        <h5 class="modal-title font-weight-bold text-uppercase" id="galleryModalLabel" style="font-family: var(--font-heading);">Room Gallery</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light">
+        <div class="input-group mb-4">
+            <input type="text" id="gallery-search-input" class="form-control border-editorial rounded-0 py-2" placeholder="Search photos (e.g., 'beach', 'sunset')...">
+            <button class="btn btn-editorial px-4" id="gallery-search-btn" type="button">Search</button>
+        </div>
+        <div id="gallery-results" class="row g-3">
+            <!-- Results will be injected here -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -49,18 +83,40 @@
     chatSocket.onmessage = function(e) {
         const data = JSON.parse(e.data);
         const messageElement = document.createElement('div');
-        messageElement.className = 'mb-2';
+        messageElement.className = 'mb-3';
         
-        // Basic escaping could be added here, but textContent handles it safely
         const strong = document.createElement('strong');
-        strong.textContent = data.username + ': ';
-        const span = document.createElement('span');
-        span.textContent = data.message;
+        strong.className = 'text-uppercase small';
+        strong.style = 'letter-spacing: 0.05em; border-bottom: 1px solid var(--accent-color);';
         
-        messageElement.appendChild(strong);
-        messageElement.appendChild(span);
+        if (data.type === 'image_message') {
+            strong.textContent = data.sender;
+            const br = document.createElement('br');
+            const imgLink = document.createElement('a');
+            imgLink.href = data.image_url;
+            imgLink.target = '_blank';
+            const img = document.createElement('img');
+            img.src = data.thumbnail_url;
+            img.className = 'img-thumbnail mt-2';
+            img.style = 'max-width: 200px;';
+            imgLink.appendChild(img);
+            
+            messageElement.appendChild(strong);
+            messageElement.appendChild(br);
+            messageElement.appendChild(imgLink);
+        } else {
+            strong.textContent = data.username;
+            const br = document.createElement('br');
+            const span = document.createElement('span');
+            span.className = 'fs-6 mt-1 d-inline-block';
+            span.textContent = data.message;
+            
+            messageElement.appendChild(strong);
+            messageElement.appendChild(br);
+            messageElement.appendChild(span);
+        }
+        
         chatLog.appendChild(messageElement);
-        
         chatLog.scrollTop = chatLog.scrollHeight; // Scroll to bottom
     };
 
@@ -85,5 +141,102 @@
             messageInputDom.value = '';
         }
     };
+
+    // --- Image Upload Logic ---
+    const imageInput = document.getElementById('chat-image-input');
+    imageInput.addEventListener('change', function() {
+        if (!this.files.length) return;
+        const file = this.files[0];
+        
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        // Disable input while uploading
+        imageInput.disabled = true;
+        
+        fetch(`/chat-media/groups/${groupCode}/upload-image/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            imageInput.disabled = false;
+            imageInput.value = ''; // Reset
+            if (data.error) {
+                alert('Upload failed: ' + data.error);
+            }
+        })
+        .catch(err => {
+            imageInput.disabled = false;
+            imageInput.value = ''; // Reset
+            console.error('Upload error:', err);
+            alert('An error occurred during upload.');
+        });
+    });
+
+    // --- Gallery Logic ---
+    const galleryModalEl = document.getElementById('galleryModal');
+    const searchInput = document.getElementById('gallery-search-input');
+    const searchBtn = document.getElementById('gallery-search-btn');
+    const galleryResults = document.getElementById('gallery-results');
+    
+    function fetchGallery(query = '') {
+        galleryResults.innerHTML = '<div class="text-center text-muted w-100 py-5">Loading...</div>';
+        const url = `/chat-media/groups/${groupCode}/search-images/` + (query ? `?q=${encodeURIComponent(query)}` : '');
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                galleryResults.innerHTML = '';
+                if (!data.results || data.results.length === 0) {
+                    galleryResults.innerHTML = '<div class="text-center text-muted w-100 py-5">No images found.</div>';
+                    return;
+                }
+                
+                data.results.forEach(img => {
+                    const col = document.createElement('div');
+                    col.className = 'col-6 col-md-4 col-lg-3';
+                    
+                    col.innerHTML = `
+                        <div class="card border-editorial rounded-0 h-100">
+                            <a href="${img.image_url}" target="_blank" class="d-block h-100">
+                                <img src="${img.thumbnail_url}" class="card-img-top rounded-0" style="object-fit: cover; height: 150px;" alt="Uploaded by ${img.uploader}">
+                            </a>
+                            <div class="card-footer bg-transparent border-top border-dark py-1 px-2 text-muted small text-truncate">
+                                ${img.uploader}
+                            </div>
+                        </div>
+                    `;
+                    galleryResults.appendChild(col);
+                });
+            })
+            .catch(err => {
+                console.error('Gallery fetch error:', err);
+                galleryResults.innerHTML = '<div class="text-center text-danger w-100 py-5">Error loading images.</div>';
+            });
+    }
+
+    if (galleryModalEl) {
+        galleryModalEl.addEventListener('show.bs.modal', function () {
+            searchInput.value = '';
+            fetchGallery(); // Fetch all initially
+        });
+    }
+
+    if (searchBtn) {
+        searchBtn.addEventListener('click', function() {
+            fetchGallery(searchInput.value.trim());
+        });
+    }
+    
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                fetchGallery(this.value.trim());
+            }
+        });
+    }
 </script>
 {% endblock %}
