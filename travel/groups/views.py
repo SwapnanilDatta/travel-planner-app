@@ -33,6 +33,9 @@ def home(request):
     groups = request.user.chat_groups.all()
     return render(request, 'groups/home.html', {'groups': groups})
 
+def about_us(request):
+    return render(request, 'groups/about_us.html')
+
 @login_required
 def create_group(request):
     if request.method == 'POST':

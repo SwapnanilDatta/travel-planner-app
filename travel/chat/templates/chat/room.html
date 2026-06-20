@@ -56,6 +56,19 @@
             <input type="text" id="gallery-search-input" class="form-control border-editorial rounded-0 py-2" placeholder="Search photos (e.g., 'beach', 'sunset')...">
             <button class="btn btn-editorial px-4" id="gallery-search-btn" type="button">Search</button>
         </div>
+        <!-- Album Filters -->
+        <div class="d-flex flex-wrap gap-2 mb-4" id="album-filters">
+            <button class="btn btn-sm btn-editorial album-btn" data-category="">All</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Beach">Beach</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Food">Food</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Museum">Museum</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Nature">Nature</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Nightlife">Nightlife</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Adventure">Adventure</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Temple">Temple</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Shopping">Shopping</button>
+            <button class="btn btn-sm btn-editorial-outline album-btn" data-category="Transportation">Transportation</button>
+        </div>
         <div id="gallery-results" class="row g-3">
             <!-- Results will be injected here -->
         </div>
@@ -183,9 +196,28 @@
     const searchBtn = document.getElementById('gallery-search-btn');
     const galleryResults = document.getElementById('gallery-results');
     
-    function fetchGallery(query = '') {
+    let currentCategory = '';
+
+    // Bind album buttons
+    document.querySelectorAll('.album-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.album-btn').forEach(b => {
+                b.classList.remove('btn-editorial');
+                b.classList.add('btn-editorial-outline');
+            });
+            this.classList.remove('btn-editorial-outline');
+            this.classList.add('btn-editorial');
+            currentCategory = this.dataset.category;
+            fetchGallery(searchInput.value.trim(), currentCategory);
+        });
+    });
+
+    function fetchGallery(query = '', category = '') {
         galleryResults.innerHTML = '<div class="text-center text-muted w-100 py-5">Loading...</div>';
-        const url = `/chat-media/groups/${groupCode}/search-images/` + (query ? `?q=${encodeURIComponent(query)}` : '');
+        let url = `/chat-media/groups/${groupCode}/search-images/?`;
+        if (query) url += `q=${encodeURIComponent(query)}&`;
+        if (category) url += `category=${encodeURIComponent(category)}&`;
+
         fetch(url)
             .then(res => res.json())
             .then(data => {
@@ -199,8 +231,12 @@
                     const col = document.createElement('div');
                     col.className = 'col-6 col-md-4 col-lg-3';
                     
+                    let badgeHTML = img.category ? `<span class="badge bg-secondary position-absolute top-0 end-0 m-1">${img.category}</span>` : '';
+                    if (img.is_duplicate) badgeHTML += `<span class="badge bg-danger position-absolute top-0 start-0 m-1">Duplicate</span>`;
+                    
                     col.innerHTML = `
-                        <div class="card border-editorial rounded-0 h-100">
+                        <div class="card border-editorial rounded-0 h-100 position-relative">
+                            ${badgeHTML}
                             <a href="${img.image_url}" target="_blank" class="d-block h-100">
                                 <img src="${img.thumbnail_url}" class="card-img-top rounded-0" style="object-fit: cover; height: 150px;" alt="Uploaded by ${img.uploader}">
                             </a>
@@ -227,14 +263,14 @@
 
     if (searchBtn) {
         searchBtn.addEventListener('click', function() {
-            fetchGallery(searchInput.value.trim());
+            fetchGallery(searchInput.value.trim(), currentCategory);
         });
     }
     
     if (searchInput) {
         searchInput.addEventListener('keyup', function(e) {
             if (e.key === 'Enter') {
-                fetchGallery(this.value.trim());
+                fetchGallery(this.value.trim(), currentCategory);
             }
         });
     }

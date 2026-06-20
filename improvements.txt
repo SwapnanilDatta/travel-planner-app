@@ -1,257 +1,531 @@
-# Feature: Image Upload + Natural Language Image Search in Django Websocket Group Chat
+# ROADMAP.md
 
-## Context
+# Smart Travel Media Intelligence System
 
-This Django project already has a working websocket-based group chat (Django Channels). This feature adds:
+## Goal
 
-1. The ability for any user in a chat room to upload photos, which appear in the chat feed in real time for everyone (like a normal message).
-2. The ability for any user to later search those uploaded images using natural language queries (e.g. "beach photos", "mountain trip", "hotel dinner") and get back the matching images.
+Extend the existing group travel planner by transforming uploaded media into structured travel preferences.
 
-## Environment / Constraints
+Instead of only supporting semantic image search:
 
-- Database: currently default Django SQLite (can be changed to a free-tier hosted DB later, but build against SQLite for now).
-- File storage: local disk (`media/` folder) for now.
-- Compute: CPU only, no GPU. Model choice must run reasonably on CPU.
-- Scale: dev/small scale (10-20 images total for now). No need for Celery, Redis task queues, FAISS, pgvector, or any vector database. Keep the implementation simple and avoid extra infrastructure — embeddings can be generated synchronously and search can be brute-force in Python.
-- Existing chat already uses Django Channels with a `ChatRoom` model and a consumer that broadcasts messages to a room group.
+```text
+Search: "beach"
+→ Return beach photos
+```
 
-## High-Level Design
+the system should automatically:
 
-### 1. Image upload (HTTP endpoint, not over the websocket)
+* Organize trip photos
+* Generate albums
+* Infer group interests
+* Feed preferences into itinerary generation
 
-Binary uploads should NOT go through the websocket connection. Instead:
+---
 
-- Frontend sends the image via a normal `POST` (multipart/form-data) to a Django view, e.g. `/chat/rooms/<room_id>/upload-image/`.
-- The view:
-  - Validates the file (size limit, allowed mime types: jpg/png/webp).
-  - Saves the file via Django's `ImageField` to `media/chat_images/`.
-  - Generates a thumbnail (max 200x200) using Pillow, saved to `media/chat_thumbnails/`.
-  - Generates a CLIP image embedding synchronously (see below) and stores it on the model.
-  - Creates a `ChatImage` record.
-  - Sends a websocket message to the room's channel group (via `channel_layer.group_send`) so all connected clients see the new image appear in the chat feed immediately, the same way text messages currently appear.
+# Current Architecture
 
-### 2. Semantic search via CLIP
+```text
+User Uploads Images
+        ↓
+Local Storage
+        ↓
+CLIP Embedding Generation
+        ↓
+Vector Store
+        ↓
+Semantic Search
+```
 
-Use the `sentence-transformers` library with the `clip-ViT-B-32` model. This model:
-- Embeds both images and text into the same 512-dimensional vector space.
-- Runs fine on CPU at this scale.
-- Downloads (~600MB) once and is cached locally; load it once at module level so it isn't reloaded per request.
+Current functionality:
 
-Flow:
-- **At upload time**: encode the uploaded image → 512-dim float vector → store as JSON in the `embedding` field on `ChatImage`.
-- **At search time**: encode the user's natural language query (e.g. "beach photos") with the same model → 512-dim query vector. Compute cosine similarity between the query vector and every stored image embedding in that room. Sort descending, filter by a similarity threshold (start around 0.2, tune empirically), return top results.
+```text
+Search:
+"beach"
 
-No vector database is needed — for 10-20 images, brute-force cosine similarity in Python with numpy is effectively instant. This can be revisited later if the dataset grows significantly (e.g. switch to pgvector + Postgres + Celery for async embedding generation).
+Output:
+Top matching beach images
+```
 
-## Data Model
+---
 
-Add a new model `ChatImage`:
+# Phase 1 — Media Categorization Engine
+
+## Objective
+
+Convert raw CLIP embeddings into meaningful travel categories.
+
+### Categories
 
 ```python
-from django.db import models
-from django.contrib.auth.models import User
-
-class ChatImage(models.Model):
-    room = models.ForeignKey('ChatRoom', on_delete=models.CASCADE, related_name='images')
-    uploader = models.ForeignKey(User, on_delete=models.CASCADE)
-    image = models.ImageField(upload_to='chat_images/')
-    thumbnail = models.ImageField(upload_to='chat_thumbnails/', blank=True, null=True)
-    embedding = models.JSONField(blank=True, null=True)  # list of 512 floats from CLIP
-    caption = models.CharField(max_length=255, blank=True)  # optional, for future use
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+CATEGORIES = {
+    "Beach",
+    "Food",
+    "Museum",
+    "Hotel",
+    "Nature",
+    "Shopping",
+    "Nightlife",
+    "Temple",
+    "Adventure",
+    "Transportation"
+}
 ```
 
-`JSONField` works fine on SQLite (Django 3.1+), so no extra DB extensions needed.
+---
 
-Run `makemigrations` / `migrate` after adding this model.
+## Category Description Generation
 
-## Dependencies
+For every category create descriptive text.
 
-```bash
-pip install sentence-transformers pillow
+Example:
+
+```text
+Beach:
+sandy beaches, ocean, sea, shoreline, sunset, water sports
+
+Museum:
+historical artifacts, galleries, exhibitions, architecture
+
+Food:
+restaurants, dishes, street food, local cuisine
 ```
 
-`sentence-transformers` brings in `torch` (CPU build is fine) — installation may take a few minutes and download ~600MB for the model on first run.
+---
 
-## Implementation Steps
+## Category Embedding Creation
 
-### Step 1: Add `ChatImage` model (above) and migrate.
+Generate CLIP text embeddings:
 
-### Step 2: Load the CLIP model once at module level
-
-In a shared module (e.g. `chat/ml.py`):
-
-```python
-from sentence_transformers import SentenceTransformer
-
-clip_model = SentenceTransformer('clip-ViT-B-32')
+```text
+encode_text(category_description)
 ```
 
-Import `clip_model` from here wherever needed, so it's loaded once per process, not per request.
+Store once during initialization.
 
-### Step 3: Upload view
-
-```python
-import io
-import numpy as np
-from PIL import Image
-from django.core.files.base import ContentFile
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
-
-from .models import ChatImage, ChatRoom
-from .ml import clip_model
-
-@login_required
-def upload_chat_image(request, room_id):
-    if request.method != 'POST' or 'image' not in request.FILES:
-        return JsonResponse({'error': 'No image provided'}, status=400)
-
-    image_file = request.FILES['image']
-
-    # Basic validation
-    allowed_types = ['image/jpeg', 'image/png', 'image/webp']
-    if image_file.content_type not in allowed_types:
-        return JsonResponse({'error': 'Unsupported file type'}, status=400)
-    max_size_mb = 8
-    if image_file.size > max_size_mb * 1024 * 1024:
-        return JsonResponse({'error': 'File too large'}, status=400)
-
-    room = ChatRoom.objects.get(id=room_id)
-
-    chat_image = ChatImage.objects.create(
-        room=room,
-        uploader=request.user,
-        image=image_file,
-    )
-
-    # Open the saved image for processing
-    pil_img = Image.open(chat_image.image.path).convert('RGB')
-
-    # Generate CLIP embedding
-    embedding = clip_model.encode(pil_img)
-    chat_image.embedding = embedding.tolist()
-
-    # Generate thumbnail
-    thumb_img = pil_img.copy()
-    thumb_img.thumbnail((200, 200))
-    thumb_io = io.BytesIO()
-    thumb_img.save(thumb_io, format='JPEG')
-    chat_image.thumbnail.save(
-        f'thumb_{chat_image.id}.jpg',
-        ContentFile(thumb_io.getvalue()),
-        save=False,
-    )
-
-    chat_image.save()
-
-    # Broadcast to the room's websocket group
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f'chat_{room_id}',
-        {
-            'type': 'chat_image_message',
-            'image_url': chat_image.image.url,
-            'thumbnail_url': chat_image.thumbnail.url,
-            'sender': request.user.username,
-            'message_id': chat_image.id,
-            'uploaded_at': chat_image.uploaded_at.isoformat(),
-        }
-    )
-
-    return JsonResponse({
-        'status': 'ok',
-        'id': chat_image.id,
-        'image_url': chat_image.image.url,
-        'thumbnail_url': chat_image.thumbnail.url,
-    })
+```text
+Beach Embedding
+Food Embedding
+Museum Embedding
+...
 ```
 
-Add a URL route, e.g.:
-```python
-path('rooms/<int:room_id>/upload-image/', upload_chat_image, name='upload_chat_image'),
+---
+
+## Image Classification
+
+For every uploaded image:
+
+```text
+Image
+ ↓
+CLIP Image Encoder
+ ↓
+Image Embedding
+ ↓
+Cosine Similarity
+ ↓
+Nearest Category
 ```
 
-### Step 4: Consumer changes
+Example:
 
-In the existing `ChatConsumer` (or equivalent), add a handler method for the `chat_image_message` group event so it gets pushed to connected clients:
+```text
+Image
 
-```python
-async def chat_image_message(self, event):
-    await self.send(text_data=json.dumps({
-        'type': 'image_message',
-        'image_url': event['image_url'],
-        'thumbnail_url': event['thumbnail_url'],
-        'sender': event['sender'],
-        'message_id': event['message_id'],
-        'uploaded_at': event['uploaded_at'],
-    }))
+Beach Similarity = 0.91
+Food Similarity = 0.23
+Museum Similarity = 0.11
+
+Result:
+Beach
 ```
 
-On the frontend, the websocket `onmessage` handler should check `data.type === 'image_message'` and render an `<img>` thumbnail in the chat feed (linking to the full image), the same way it currently renders text messages but with an image element instead of text.
+Store:
 
-### Step 5: Search view
-
-```python
-@login_required
-def search_chat_images(request, room_id):
-    query = request.GET.get('q', '').strip()
-    if not query:
-        return JsonResponse({'results': []})
-
-    images = ChatImage.objects.filter(room_id=room_id).exclude(embedding=None)
-
-    query_embedding = clip_model.encode(query)
-
-    results = []
-    for img in images:
-        img_embedding = np.array(img.embedding)
-        score = float(np.dot(query_embedding, img_embedding) / (
-            np.linalg.norm(query_embedding) * np.linalg.norm(img_embedding)
-        ))
-        results.append((img, score))
-
-    results.sort(key=lambda x: x[1], reverse=True)
-
-    SIMILARITY_THRESHOLD = 0.2  # tune this empirically based on real results
-    top_results = [r for r in results if r[1] > SIMILARITY_THRESHOLD][:10]
-
-    return JsonResponse({
-        'results': [
-            {
-                'id': img.id,
-                'image_url': img.image.url,
-                'thumbnail_url': img.thumbnail.url,
-                'score': round(score, 4),
-                'uploader': img.uploader.username,
-                'uploaded_at': img.uploaded_at.isoformat(),
-            }
-            for img, score in top_results
-        ]
-    })
+```json
+{
+  "image_id": 12,
+  "category": "Beach",
+  "confidence": 0.91
+}
 ```
 
-Add a URL route:
-```python
-path('rooms/<int:room_id>/search-images/', search_chat_images, name='search_chat_images'),
+---
+
+# Phase 2 — Automatic Album Generation
+
+## Objective
+
+Create travel albums automatically.
+
+### Group Images
+
+Group by category:
+
+```text
+Beach
+ ├─ img1
+ ├─ img2
+ ├─ img3
+
+Food
+ ├─ img4
+ ├─ img5
 ```
 
-### Step 6: Frontend
+---
 
-1. **Upload UI**: Add a file input / "attach photo" button near the chat input box. On file select, `POST` to `/chat/rooms/<room_id>/upload-image/` via `fetch` with `FormData`. No need to manually append the result to the chat — the websocket broadcast (Step 4) will push it to everyone including the uploader.
+## Album Generation
 
-2. **Search UI**: Add a separate search bar/icon (e.g. above the chat or in a sidebar). On submit, `GET` `/chat/rooms/<room_id>/search-images/?q=<query>`, and render returned thumbnails in a grid/modal/lightbox. Clicking a thumbnail opens the full-size image (`image_url`).
+Create albums automatically.
 
-## Things to tune after initial implementation
+Example:
 
-- **Similarity threshold**: 0.2 is a starting point. Test with real uploaded images and adjust so genuinely relevant results show up without too many false positives.
-- **File size / type limits**: adjust based on real usage.
-- **CSRF**: ensure the upload/search fetch requests include the CSRF token if using Django's standard session auth (`X-CSRFToken` header).
+```text
+Goa Trip
 
-## Future improvements (not needed now, but good to know)
+📁 Beach (34 photos)
 
-- If image volume grows significantly (hundreds+ per room), move to Postgres + `pgvector` for embedding storage and indexed similarity search instead of brute-force Python loops.
-- If embedding generation starts blocking requests noticeably, move it to a Celery background task (Redis is likely already available since Channels uses it as the channel layer).
-- Optionally add an image captioning model (e.g. BLIP) at upload time to store a human-readable caption alongside the embedding, useful for displaying "what Claude/AI thinks this image is" or for keyword-based fallback search.
+📁 Food (18 photos)
+
+📁 Nightlife (12 photos)
+
+📁 Nature (9 photos)
+```
+
+---
+
+## UI Feature
+
+Add:
+
+```text
+Media
+
+[ All ]
+
+[ Beach ]
+
+[ Food ]
+
+[ Museum ]
+
+[ Hotel ]
+```
+
+One-click filtering.
+
+---
+
+# Phase 3 — Preference Mining
+
+## Objective
+
+Infer travel interests from uploaded media.
+
+---
+
+## Individual Preference Profile
+
+For each user:
+
+```text
+Beach Photos = 20
+
+Food Photos = 10
+
+Museum Photos = 5
+```
+
+Normalize:
+
+```json
+{
+  "Beach": 57,
+  "Food": 29,
+  "Museum": 14
+}
+```
+
+---
+
+## Group Preference Profile
+
+Aggregate all members.
+
+Example:
+
+```json
+{
+  "Beach": 42,
+  "Food": 31,
+  "Nightlife": 18,
+  "Museum": 9
+}
+```
+
+Store:
+
+```json
+group_preferences
+```
+
+---
+
+# Phase 4 — Itinerary Integration
+
+## Objective
+
+Use image-derived preferences during itinerary generation.
+
+Current:
+
+```text
+User Prompt
+ ↓
+LLM
+ ↓
+Itinerary
+```
+
+Future:
+
+```text
+User Prompt
+ +
+Group Preferences
+ ↓
+Planning Agent
+ ↓
+Personalized Itinerary
+```
+
+---
+
+## Example
+
+Detected:
+
+```json
+{
+  "Beach": 50,
+  "Food": 30,
+  "Museum": 10,
+  "Nightlife": 10
+}
+```
+
+Planner should prioritize:
+
+* Beach activities
+* Water sports
+* Local restaurants
+* Sunset viewpoints
+
+Planner should reduce:
+
+* Museum visits
+* Historical tours
+
+````
+
+---
+
+# Phase 5 — Duplicate Detection
+
+## Objective
+
+Remove redundant photos.
+
+---
+
+## Similarity Detection
+
+For every new image:
+
+```text
+New Image Embedding
+ ↓
+Nearest Neighbor Search
+ ↓
+Similarity Score
+````
+
+If:
+
+```text
+similarity > 0.95
+```
+
+mark as duplicate.
+
+---
+
+## UI
+
+```text
+12 Similar Photos Found
+
+Keep Best Version?
+```
+
+---
+
+# Phase 6 — Analytics Dashboard
+
+## Objective
+
+Visualize travel interests.
+
+Example:
+
+```text
+Group Insights
+
+Beach      ████████████ 42%
+Food       ████████ 31%
+Nightlife  ████ 18%
+Museum     ██ 9%
+```
+
+---
+
+# Database Design
+
+## media
+
+```sql
+id
+group_id
+user_id
+file_path
+created_at
+```
+
+---
+
+## image_embeddings
+
+```sql
+id
+media_id
+embedding_vector
+```
+
+---
+
+## image_categories
+
+```sql
+id
+media_id
+category
+confidence
+```
+
+---
+
+## group_preferences
+
+```sql
+group_id
+beach_score
+food_score
+museum_score
+nature_score
+shopping_score
+nightlife_score
+```
+
+---
+
+# ML Stack
+
+## Computer Vision
+
+* CLIP
+* OpenCLIP
+
+---
+
+## Vector Search
+
+Development:
+
+* FAISS
+
+Production:
+
+* Qdrant
+* Weaviate
+
+---
+
+## Backend
+
+* FastAPI
+* WebSockets
+
+---
+
+## Storage
+
+Development:
+
+* Local Files
+
+Production:
+
+* S3 Compatible Storage
+
+---
+
+# Success Metrics
+
+## Retrieval
+
+Target:
+
+```text
+Top-1 Category Accuracy > 85%
+```
+
+---
+
+## User Experience
+
+Target:
+
+```text
+Album generation < 2 seconds
+```
+
+---
+
+## Recommendation Quality
+
+Measure:
+
+```text
+Preference-aware itinerary
+vs
+generic itinerary
+```
+
+through user feedback.
+
+---
+
+# Final Deliverable
+
+The system should not simply search photos.
+
+The system should:
+
+1. Understand uploaded travel media.
+2. Organize media automatically.
+3. Learn group interests.
+4. Influence itinerary recommendations.
+5. Reduce manual trip planning effort.
+
+This turns the media module into a recommendation signal for the travel planning agent rather than a standalone image search feature.

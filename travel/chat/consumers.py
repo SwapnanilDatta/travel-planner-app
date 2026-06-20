@@ -72,4 +72,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender': event['sender'],
             'message_id': event['message_id'],
             'uploaded_at': event['uploaded_at'],
+            'category': event.get('category'),
+            'is_duplicate': event.get('is_duplicate'),
         }))

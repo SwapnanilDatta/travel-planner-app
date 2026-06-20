@@ -9,7 +9,7 @@ from asgiref.sync import async_to_sync
 
 from .models import ChatImage
 from groups.models import ChatGroup
-from .ml import clip_model
+from .ml import clip_model, CATEGORY_EMBEDDINGS
 
 @login_required
 def upload_chat_image(request, group_code):
@@ -41,6 +41,29 @@ def upload_chat_image(request, group_code):
     embedding = clip_model.encode(pil_img)
     chat_image.embedding = embedding.tolist()
 
+    # 1. Duplicate detection
+    existing_images = ChatImage.objects.filter(group=group).exclude(id=chat_image.id).exclude(embedding=None)
+    is_duplicate = False
+    for img in existing_images:
+        img_emb = np.array(img.embedding)
+        sim = float(np.dot(embedding, img_emb) / (np.linalg.norm(embedding) * np.linalg.norm(img_emb)))
+        if sim > 0.95:
+            is_duplicate = True
+            break
+    chat_image.is_duplicate = is_duplicate
+
+    # 2. Categorization
+    best_category = None
+    best_confidence = -1.0
+    for cat_name, cat_emb in CATEGORY_EMBEDDINGS.items():
+        sim = float(np.dot(embedding, cat_emb) / (np.linalg.norm(embedding) * np.linalg.norm(cat_emb)))
+        if sim > best_confidence:
+            best_confidence = sim
+            best_category = cat_name
+            
+    chat_image.category = best_category
+    chat_image.confidence = best_confidence
+
     thumb_img = pil_img.copy()
     thumb_img.thumbnail((200, 200))
     thumb_io = io.BytesIO()
@@ -63,6 +86,8 @@ def upload_chat_image(request, group_code):
             'sender': request.user.username,
             'message_id': chat_image.id,
             'uploaded_at': chat_image.uploaded_at.isoformat(),
+            'category': chat_image.category,
+            'is_duplicate': chat_image.is_duplicate
         }
     )
 
@@ -71,13 +96,19 @@ def upload_chat_image(request, group_code):
         'id': chat_image.id,
         'image_url': chat_image.image.url,
         'thumbnail_url': chat_image.thumbnail.url,
+        'category': chat_image.category,
+        'is_duplicate': chat_image.is_duplicate
     })
 
 @login_required
 def search_chat_images(request, group_code):
     query = request.GET.get('q', '').strip()
+    category = request.GET.get('category', '').strip()
     
     images = ChatImage.objects.filter(group__code=group_code).exclude(embedding=None).order_by('-uploaded_at')
+
+    if category:
+        images = images.filter(category=category)
 
     if not query:
         # Return all images (Gallery mode)
@@ -89,7 +120,9 @@ def search_chat_images(request, group_code):
                     'thumbnail_url': img.thumbnail.url,
                     'uploader': img.uploader.username,
                     'uploaded_at': img.uploaded_at.isoformat(),
-                    'score': 1.0
+                    'score': 1.0,
+                    'category': img.category,
+                    'is_duplicate': img.is_duplicate
                 }
                 for img in images
             ]
@@ -119,6 +152,8 @@ def search_chat_images(request, group_code):
                 'score': round(score, 4),
                 'uploader': img.uploader.username,
                 'uploaded_at': img.uploaded_at.isoformat(),
+                'category': img.category,
+                'is_duplicate': img.is_duplicate
             }
             for img, score in top_results
         ]
