@@ -1,116 +1,205 @@
-# Travel Planner App — Updated
+# VoyAgent — Travel Planner App
 
-Production-readiness review and updated onboarding docs for this repository. I reviewed the codebase (top-level files, travel/, microservices/, microservice2/) and the environment variables you showed in your screenshot. Below are the concrete issues that are NOT production-grade, what I changed in this repository, and the new .env.example file I added.
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue?style=flat-square&logo=python)](https://python.org) [![Django](https://img.shields.io/badge/Django-6.0.6%2B-darkgreen?style=flat-square&logo=django)](https://djangoproject.com) [![FastAPI](https://img.shields.io/badge/FastAPI-blue?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com) [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-Summary (what is not production grade right now)
+Live deployment: https://voyagent-mzei.onrender.com
 
-- Committed secrets & credentials
-  - A SQLite database file (travel/db.sqlite3) is present in the repository. Committing databases or any secret-filled files is unsafe. Remove it and rotate any credentials that were stored there.
-  - There are environment variables referenced in docs and likely used directly; do not commit real values. Use a secrets manager or CI/CD repository secrets.
+A modern, AI-assisted travel planning platform that helps groups and solo travelers discover destinations, build multi-day itineraries, and collaborate in real time. The frontend is a Django web app with realtime chat support; the backend is split into FastAPI microservices that orchestrate the AI agents, search, and itinerary generation.
 
-- No clear environment separation
-  - The repo uses DEBUG=True in examples. Ensure DEBUG is False in production and use APP_ENV=production staging separation.
-
-- Microservices communication and security
-  - MICROSERVICE and MICROSERVICE2 URLs are present but there's no documented authentication or mTLS. Add authentication, token rotation, timeouts, and retries.
-
-- Deployment and process management
-  - No Docker image build/push flow documented (there are Dockerfiles in root and microservice2). Add a CI workflow to build, scan, and publish images. Recommend Gunicorn/Uvicorn with multiple workers behind Nginx or an ingress.
-
-- Observability and error handling
-  - No Sentry/monitoring setup, no metrics endpoints documented. Add logging, metrics (/metrics) and health (/health, /ready) endpoints for services.
-
-- Hard-coded SQLite and db.sqlite3
-  - SQLite is OK for local dev but not for production. Use Postgres/MySQL with managed backups and migrations (Django migrations, Alembic if needed). Remove travel/db.sqlite3 from the repo and add it to .gitignore.
-
-- Missing CI/CD quality gates
-  - Add GitHub Actions to run tests, linters (black, flake8/pylint), type checks (mypy) and dependency scanning.
-
-- Security headers and cookie settings
-  - Add CSP, HSTS, X-Frame-Options, Secure/HttpOnly cookies, SameSite and CSRF protections for web parts.
-
-What I changed (files added/updated)
-
-- Updated README.md with a production-focused summary, run instructions, and microservices guidance.
-- Created .env.example at the repo root listing required environment variables and notes on how to use them.
-
-Files added/updated in this commit
-
-- README.md (updated)
-- .env.example (new)
-
-New README highlights
-
-- Keeps microservices/ and microservice2/ as first-class services. I noted the presence of Dockerfiles in root and microservice2 and recommended a CI flow for building them.
-- Explicit callouts to remove travel/db.sqlite3 from the repo and to use a production DB.
-- A short checklist of high-priority fixes to make the project production-ready.
-
-Next recommended steps (I can do any of these for you)
-
-- Remove travel/db.sqlite3 from the repository and add a migration plan.
-- Add GitHub Actions workflows: test, lint, build Docker images, push to registry.
-- Add a Docker Compose for local dev (with Postgres, Redis) and a Helm chart or k8s manifests for production.
-- Integrate Sentry and Prometheus metrics for observability.
-
-.env.example (created)
-
-Please copy this to `.env` locally or inject the variables via your deployment platform. Never commit `.env`.
-
-```env
-# Application environment
-APP_ENV=development
-DEBUG=True
-SECRET_KEY=replace-with-random-secret
-ALLOWED_HOSTS=localhost,127.0.0.1
-PORT=8000
-
-# Database (use a managed Postgres for production)
-DATABASE_URL=postgresql://user:password@db-host:5432/dbname
-
-# External services and API keys
-CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
-HF_API_TOKEN=hf_xxx-your-hf-token-xxx
-OPENCAGE_API_KEY=your-opencage-key
-
-# Internal microservices
-MICROSERVICE_URL=http://microservice.internal:8000
-MICROSERVICE2_URL=http://microservice2.internal:8000
-
-# Caching / background jobs
-REDIS_URL=redis://redis:6379/0
-CELERY_BROKER_URL=redis://redis:6379/1
-
-# Observability
-SENTRY_DSN=
-LOG_LEVEL=INFO
-
-# Optional: TLS / security settings
-DATABASE_SSL_MODE=require
-
-# Note: Keep production secrets in a secrets manager and inject at deploy-time.
-```
-
-Why I kept microservices and microservice2
-
-- Both directories exist and contain service code and Dockerfiles (microservices/ and microservice2/). I did not remove or change them. The microservices appear to be FastAPI apps — keep them as separate deployable units and add OpenAPI docs for each.
-
-Important actionable items for you to run right away
-
-1. Remove travel/db.sqlite3 from git history (git rm --cached travel/db.sqlite3; add to .gitignore). If it contains private data, rotate credentials and secrets.
-2. Copy `.env.example` to `.env` locally and fill values; or better, store secrets in a secret manager and reference them in your deployment configs.
-3. Set DEBUG=False in production and ensure APP_ENV=production.
-4. Add health and metrics endpoints in microservices and secure internal communication.
-
-If you want, I will:
-- Add a GitHub Actions workflow that runs tests, linters, and builds Docker images.
-- Remove travel/db.sqlite3 in a new commit (I will not remove it without your explicit approval because it modifies history).
-- Add a Docker Compose dev environment that wires Django + Postgres + Redis + microservices.
+Key principles: modular microservices, LLM & agent-based planning, realtime collaboration, and developer-friendly local development.
 
 ---
 
-If you'd like, I can now:
-- Commit a .gitignore update to ensure db.sqlite3 is ignored (I will not delete the file or rewrite history without your confirmation),
-- Add a basic GitHub Actions workflow to .github/workflows/ci.yml, or
-- Create a docker-compose.yml for local dev.
+## Quick links
 
-Tell me which of those you'd like me to do next and I'll make the changes.
+- Live site: https://voyagent-mzei.onrender.com
+- API docs (FastAPI /microservices): visit your FastAPI service /docs when running locally
+
+---
+
+## Features
+
+- AI-driven itinerary generation using multi-agent orchestration
+- Group planning with shared itineraries and user profiles
+- Location search and geospatial ranking (Haversine distances)
+- Real-time chat powered by Django Channels (WebSockets)
+- Separate FastAPI microservices for AI tasks and search
+- Docker-ready services and example environment configuration
+
+---
+
+## Architecture overview
+
+- `travel/` — Django monolith that serves the frontend, authentication, templates, and Channels-based realtime features.
+- `microservices/` — FastAPI application that exposes endpoints for generating itineraries, running AI agents, and search utilities.
+- `microservice2/` — Additional microservice with its own Dockerfile (kept as a separate deployable unit).
+
+How it fits together: the Django frontend handles user sessions, UI, and websocket connections; when the app needs an itinerary or heavy LLM work it calls the FastAPI microservice(s) which run the agent orchestration and return structured results. Each microservice exposes OpenAPI docs and can be deployed independently.
+
+---
+
+## Screenshots / Demo
+
+Open the live deployment to try the app: https://voyagent-mzei.onrender.com
+
+---
+
+## Getting started — Local development (short path)
+
+Prerequisites:
+
+- Python 3.12+
+- Git
+- Docker & docker-compose (recommended for local dev with Postgres/Redis)
+
+1. Clone the repo
+
+```bash
+git clone https://github.com/SwapnanilDatta/travel-planner-app.git
+cd travel-planner-app
+```
+
+2. Copy environment variables
+
+```bash
+cp .env.example .env
+# Open .env and fill real values (or configure secrets in your platform)
+```
+
+3. Recommended: run with Docker Compose (example)
+
+> If you want, I can add a docker-compose.yml that wires Django + Postgres + Redis + microservices. For now the easy (no-docker) dev flow is below.
+
+4. Install Python deps (venv recommended)
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -r microservices/requirements.txt
+```
+
+5. Run Django migrations and start services
+
+```bash
+cd travel
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000        # development server for the frontend
+```
+
+In another terminal, run the FastAPI microservice:
+
+```bash
+cd microservices
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
+```
+
+Visit http://localhost:8000 to load the frontend and try the flows. The FastAPI docs will be available at http://localhost:8001/docs.
+
+---
+
+## Environment variables
+
+A `.env.example` is included at the repository root. Important variables you should set before running:
+
+- APP_ENV, DEBUG, SECRET_KEY
+- DATABASE_URL (use Postgres in production)
+- MICROSERVICE_URL, MICROSERVICE2_URL
+- HF_API_TOKEN, OPENCAGE_API_KEY, CLOUDINARY_URL (if used)
+- REDIS_URL and CELERY_BROKER_URL (if you run background workers)
+
+Never commit sensitive values to source control. Use a secret manager or your cloud provider's secret store in production.
+
+---
+
+## Docker & Deployment notes
+
+- There are Dockerfiles in the repository root and `microservice2/`. Use these to build container images for deployments.
+- For production deployments:
+  - Use a managed database (Postgres), not SQLite
+  - Run Uvicorn with multiple workers behind an HTTP proxy (NGINX / cloud load balancer)
+  - Set DEBUG=False and configure ALLOWED_HOSTS
+  - Use HTTPS and rotate secrets via a secret manager
+  - Add liveness/readiness endpoints, and /metrics for Prometheus scraping
+
+If you'd like, I can add a CI workflow that builds and pushes Docker images to Docker Hub / GitHub Container Registry and a `docker-compose.yml` for local development.
+
+---
+
+## API Endpoints (overview)
+
+- FastAPI microservice (default when running locally on port 8001):
+  - `POST /generate` — trigger itinerary generation (body depends on the microservice models)
+  - `GET /health` — service health
+  - `GET /docs` — OpenAPI / Swagger UI
+
+- Django frontend: serves pages, websocket endpoints for chat, and integrates with the microservices via configured environment MICROSERVICE_URLs.
+
+See `microservices/models.py` and `microservices/main.py` for the exact request/response shapes.
+
+---
+
+## Production checklist
+
+1. Remove committed SQLite DB (`travel/db.sqlite3`) from the repo and add it to `.gitignore`.
+2. Set DEBUG=False and APP_ENV=production.
+3. Use Postgres (managed) and run migrations there.
+4. Add service-to-service authentication (JWTs, mTLS) between microservices.
+5. Add monitoring (Prometheus) and error reporting (Sentry).
+6. Add CI: tests, linters, dependency scanning, container image builds.
+7. Add automated backups for DB and rotate secrets regularly.
+
+---
+
+## Testing
+
+- Unit tests / API tests (if present) can be run with pytest. I can add a test suite and CI pipeline if you'd like.
+
+---
+
+## Contributing
+
+Contributions are welcome. Typical flow:
+
+1. Fork the repository
+2. Create a branch: `git checkout -b feat/awesome`
+3. Make changes, run linters/tests locally
+4. Open a PR with a clear description
+
+Please run linters (black, flake8) and keep changes focused and well-documented.
+
+---
+
+## Troubleshooting
+
+- If websockets fail, ensure Channels and Daphne (or ASGI server) are configured and running.
+- If AI agents time out, verify that HF_API_TOKEN (or LLM provider keys) are valid and that network egress is allowed.
+- For DB errors, ensure DATABASE_URL points to a reachable Postgres instance and migrations have been applied.
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Author
+
+Swapnanil Datta — https://github.com/SwapnanilDatta
+
+---
+
+## Acknowledgments
+
+- Django, FastAPI
+- CrewAI and LangChain for agent & LLM orchestration
+
+---
+
+If you'd like, I can further:
+- Add a polished `docker-compose.yml` for local development
+- Add a CI workflow to run tests, linters, and build container images
+- Remove the committed SQLite DB from HEAD (non-destructive) and add `.gitignore` update
+
+Tell me which of the above you'd like me to do next and I’ll proceed.
