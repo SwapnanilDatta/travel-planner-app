@@ -33,6 +33,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dth9v5l1ftf@8t5xv@carftcb8
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'https://voyagent-mzei.onrender.com').split(',')
 
 
 # Application definition
