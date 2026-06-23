@@ -41,7 +41,7 @@ clip_model = MicroserviceClipModel()
 
 # Define and compute category embeddings on startup
 CATEGORIES = {
-    "Beach": "sandy beaches, ocean, sea, shoreline, sunset, water sports",
+    "Beach": "a photo of a beach with sand, ocean waves and coastline",
     "Food": "restaurants, dishes, street food, local cuisine",
     "Museum": "historical artifacts, galleries, exhibitions, architecture",
     "Hotel": "hotel rooms, lobby, resort, accommodation",
