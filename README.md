@@ -4,7 +4,7 @@
 
 Live deployment: https://voyagent-mzei.onrender.com
 
-A modern, AI-assisted travel planning platform that helps groups and solo travelers discover destinations, build multi-day itineraries, and collaborate in real time. The frontend is a Django web app with realtime chat support; the backend is split into FastAPI microservices that orchestrate the AI agents, search, and itinerary generation.
+A modern, AI-assisted travel planning platform that helps groups and solo travelers discover destinations, build multi-day itineraries, and collaborate in real time. The frontend is a Django web app with realtime chat support; the backend is split into FastAPI microservices that orchestrate the AI agents, search, itinerary generation — and image classification.
 
 Key principles: modular microservices, LLM & agent-based planning, realtime collaboration, and developer-friendly local development.
 
@@ -23,18 +23,19 @@ Key principles: modular microservices, LLM & agent-based planning, realtime coll
 - Group planning with shared itineraries and user profiles
 - Location search and geospatial ranking (Haversine distances)
 - Real-time chat powered by Django Channels (WebSockets)
-- Separate FastAPI microservices for AI tasks and search
+- Image classification and visual search: microservice2 uses CLIP-based models to classify and embed images; the Django app contains `travel/ml.py` with helper inference utilities
+- Separate FastAPI microservices for AI tasks, search, and vision
 - Docker-ready services and example environment configuration
 
 ---
 
 ## Architecture overview
 
-- `travel/` — Django monolith that serves the frontend, authentication, templates, and Channels-based realtime features.
+- `travel/` — Django monolith that serves the frontend, authentication, templates, and Channels-based realtime features. Also contains `travel/ml.py` which implements image preprocessing and model inference helpers used by the app and microservice integrations.
 - `microservices/` — FastAPI application that exposes endpoints for generating itineraries, running AI agents, and search utilities.
-- `microservice2/` — Additional microservice with its own Dockerfile (kept as a separate deployable unit).
+- `microservice2/` — FastAPI microservice focused on vision capabilities: it hosts CLIP-based image classification and embedding endpoints and has its own Dockerfile (kept as a separate deployable unit).
 
-How it fits together: the Django frontend handles user sessions, UI, and websocket connections; when the app needs an itinerary or heavy LLM work it calls the FastAPI microservice(s) which run the agent orchestration and return structured results. Each microservice exposes OpenAPI docs and can be deployed independently.
+How it fits together: the Django frontend handles user sessions, UI, and websocket connections; when the app needs an itinerary, vision inference, or heavy LLM work it calls the appropriate FastAPI microservice(s) which run the agent orchestration, vision inference, or search and return structured results. Each microservice exposes OpenAPI docs and can be deployed independently.
 
 ---
 
@@ -94,7 +95,14 @@ cd microservices
 uvicorn main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-Visit http://localhost:8000 to load the frontend and try the flows. The FastAPI docs will be available at http://localhost:8001/docs.
+If you want to run the vision microservice locally (microservice2):
+
+```bash
+cd microservice2
+uvicorn main:app --reload --host 0.0.0.0 --port 8002
+```
+
+Visit http://localhost:8000 to load the frontend and try the flows. The FastAPI docs will be available at http://localhost:8001/docs and http://localhost:8002/docs for microservice2.
 
 ---
 
@@ -133,9 +141,14 @@ If you'd like, I can add a CI workflow that builds and pushes Docker images to D
   - `GET /health` — service health
   - `GET /docs` — OpenAPI / Swagger UI
 
+- Vision microservice (microservice2 on port 8002):
+  - `POST /classify` — classify or embed images using CLIP-style models
+  - `GET /health` — service health
+  - `GET /docs` — OpenAPI / Swagger UI
+
 - Django frontend: serves pages, websocket endpoints for chat, and integrates with the microservices via configured environment MICROSERVICE_URLs.
 
-See `microservices/models.py` and `microservices/main.py` for the exact request/response shapes.
+See `microservices/models.py`, `microservice2/main.py` and `travel/ml.py` for the exact request/response shapes and the image preprocessing/inference utilities.
 
 ---
 
@@ -145,8 +158,8 @@ See `microservices/models.py` and `microservices/main.py` for the exact request/
 2. Set DEBUG=False and APP_ENV=production.
 3. Use Postgres (managed) and run migrations there.
 4. Add service-to-service authentication (JWTs, mTLS) between microservices.
-5. Add monitoring (Prometheus) and error reporting (Sentry).
-6. Add CI: tests, linters, dependency scanning, container image builds.
+5. Add /health, /ready and /metrics endpoints; integrate Sentry + Prometheus.
+6. Add CI: tests, linters, dependency scanning, and container image builds.
 7. Add automated backups for DB and rotate secrets regularly.
 
 ---
@@ -175,6 +188,7 @@ Please run linters (black, flake8) and keep changes focused and well-documented.
 - If websockets fail, ensure Channels and Daphne (or ASGI server) are configured and running.
 - If AI agents time out, verify that HF_API_TOKEN (or LLM provider keys) are valid and that network egress is allowed.
 - For DB errors, ensure DATABASE_URL points to a reachable Postgres instance and migrations have been applied.
+- For image classification issues, ensure the CLIP model artifacts are available to microservice2 and that `travel/ml.py` preprocessing matches the microservice2 model input expectations.
 
 ---
 
