@@ -87,7 +87,10 @@ Using ONLY the city report provided by the previous agent (do NOT re-search
 destinations already covered), analyse logistics for a
 {total_days}-day trip.
 
-Group size  : {trip_details['group_size']} ({num_members} members, each with their own preferences)
+Group size  : {trip_details['group_size']} ({num_members} members)
+Group Details:
+{members_str}
+
 Pace        : {trip_details['pace']}
 Budget      : {trip_details['budget_per_day_INR']} INR ({trip_details['budget_type']})
 
@@ -139,9 +142,10 @@ CRITICAL:
 - Do NOT perform any web searches.
 - Do NOT invent constraints (e.g. mobility issues) that aren't explicitly
   in the group's data. Mobility constraints in this group: {any_mobility_constraints}.
-- This is a group of {num_members} member(s) with individually-set
-  preferences (not a solo trip) — make sure the plan reflects a mix that
-  serves everyone, not a single averaged "persona".
+- This is a group of {num_members} member(s). Here are their specific details and preferences:
+{members_str}
+- You MUST explicitly mention the members by NAME in the daily itinerary. For example, explain how an activity specifically caters to John's high rating for History, while the next activity caters to Sarah's love for Food. Do NOT write a generic solo itinerary!
+- If preferences strongly diverge, you can suggest that the group temporarily splits up for an afternoon (e.g., "While John visits the Museum, Sarah can explore the Shopping district").
 - Make the plan realistic and address all group constraints.
 - The group's accommodation is FIXED at {hotel_str}. Do NOT mention, name,
   suggest, or recommend any other hotel/accommodation. You may reference
