@@ -13,24 +13,28 @@ class HFClipModel:
     def encode(self, input_data):
         max_retries = 3
         for attempt in range(max_retries):
-            if isinstance(input_data, str):
-                payload = {"inputs": input_data}
-                response = requests.post(API_URL, headers=headers, json=payload)
-            else:
-                # Assume it's a PIL Image
-                buffered = io.BytesIO()
-                input_data.save(buffered, format="JPEG")
-                img_bytes = buffered.getvalue()
-                response = requests.post(API_URL, headers=headers, data=img_bytes)
-            
-            if response.status_code == 200:
-                return np.array(response.json()).flatten()
-            elif response.status_code == 503:
-                # Model is loading
-                time.sleep(15)
-            else:
-                print(f"HF API Error: {response.text}")
-                return np.zeros(512)
+            try:
+                if isinstance(input_data, str):
+                    payload = {"inputs": input_data}
+                    response = requests.post(API_URL, headers=headers, json=payload, timeout=10)
+                else:
+                    # Assume it's a PIL Image
+                    buffered = io.BytesIO()
+                    input_data.save(buffered, format="JPEG")
+                    img_bytes = buffered.getvalue()
+                    response = requests.post(API_URL, headers=headers, data=img_bytes, timeout=15)
+                
+                if response.status_code == 200:
+                    return np.array(response.json()).flatten()
+                elif response.status_code == 503:
+                    # Model is loading
+                    time.sleep(15)
+                else:
+                    print(f"HF API Error: {response.text}")
+                    return np.zeros(512)
+            except requests.exceptions.RequestException as e:
+                print(f"HF API Network Error: {e}")
+                time.sleep(2)
         return np.zeros(512)
 
 clip_model = HFClipModel()
@@ -49,6 +53,13 @@ CATEGORIES = {
     "Transportation": "trains, buses, airplanes, roads, vehicles",
 }
 
-CATEGORY_EMBEDDINGS = {}
-for category_name, description in CATEGORIES.items():
-    CATEGORY_EMBEDDINGS[category_name] = clip_model.encode(description)
+_CATEGORY_EMBEDDINGS = None
+
+def get_category_embeddings():
+    global _CATEGORY_EMBEDDINGS
+    if _CATEGORY_EMBEDDINGS is None:
+        print("Lazy-loading category embeddings from HF API...")
+        _CATEGORY_EMBEDDINGS = {}
+        for category_name, description in CATEGORIES.items():
+            _CATEGORY_EMBEDDINGS[category_name] = clip_model.encode(description)
+    return _CATEGORY_EMBEDDINGS

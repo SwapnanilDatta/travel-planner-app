@@ -9,7 +9,7 @@ from asgiref.sync import async_to_sync
 
 from .models import ChatImage
 from groups.models import ChatGroup
-from .ml import clip_model, CATEGORY_EMBEDDINGS
+from .ml import clip_model, get_category_embeddings
 
 @login_required
 def upload_chat_image(request, group_code):
@@ -55,7 +55,7 @@ def upload_chat_image(request, group_code):
     # 2. Categorization
     best_category = None
     best_confidence = -1.0
-    for cat_name, cat_emb in CATEGORY_EMBEDDINGS.items():
+    for cat_name, cat_emb in get_category_embeddings().items():
         sim = float(np.dot(embedding, cat_emb) / (np.linalg.norm(embedding) * np.linalg.norm(cat_emb)))
         if sim > best_confidence:
             best_confidence = sim
