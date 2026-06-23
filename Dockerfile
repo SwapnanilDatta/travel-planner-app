@@ -17,12 +17,10 @@ COPY . /app/
 # Switch to the travel app directory
 WORKDIR /app/travel
 
-# Collect static files
-# (This uses the SQLite fallback during build since DATABASE_URL isn't set yet)
-RUN python manage.py collectstatic --no-input
+# (Skipping collectstatic during build phase to avoid missing environment variable errors)
 
 # Expose port
 EXPOSE 8000
 
 # Run Daphne (ASGI server for Django Channels)
-CMD ["sh", "-c", "python manage.py migrate && daphne -b 0.0.0.0 -p ${PORT:-8000} travel.asgi:application"]
+CMD ["sh", "-c", "python manage.py collectstatic --no-input && python manage.py migrate && daphne -b 0.0.0.0 -p ${PORT:-8000} travel.asgi:application"]
