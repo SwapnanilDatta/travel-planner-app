@@ -4,40 +4,40 @@ import time
 import requests
 import numpy as np
 
-# Load the API token and URL
-HF_API_TOKEN = os.getenv('HF_API_TOKEN')
-API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/clip-ViT-B-32"
-headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+import base64
 
-class HFClipModel:
+# Load the API URL for microservice2
+MICROSERVICE2_URL = os.getenv('MICROSERVICE2_URL', 'http://127.0.0.1:8001/embed')
+
+class MicroserviceClipModel:
     def encode(self, input_data):
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 if isinstance(input_data, str):
-                    payload = {"inputs": input_data}
-                    response = requests.post(API_URL, headers=headers, json=payload, timeout=10)
+                    payload = {"text": input_data}
+                    response = requests.post(MICROSERVICE2_URL, json=payload, timeout=10)
                 else:
                     # Assume it's a PIL Image
                     buffered = io.BytesIO()
                     input_data.save(buffered, format="JPEG")
-                    img_bytes = buffered.getvalue()
-                    response = requests.post(API_URL, headers=headers, data=img_bytes, timeout=15)
+                    img_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                    payload = {"image_b64": img_b64}
+                    response = requests.post(MICROSERVICE2_URL, json=payload, timeout=15)
                 
                 if response.status_code == 200:
-                    return np.array(response.json()).flatten()
-                elif response.status_code == 503:
-                    # Model is loading
-                    time.sleep(15)
-                else:
-                    print(f"HF API Error: {response.text}")
-                    return np.zeros(512)
+                    data = response.json()
+                    if 'embedding' in data:
+                        return np.array(data['embedding']).flatten()
+                    
+                print(f"Microservice API Error: {response.status_code} - {response.text}")
+                return np.zeros(512)
             except requests.exceptions.RequestException as e:
-                print(f"HF API Network Error: {e}")
+                print(f"Microservice Network Error: {e}")
                 time.sleep(2)
         return np.zeros(512)
 
-clip_model = HFClipModel()
+clip_model = MicroserviceClipModel()
 
 # Define and compute category embeddings on startup
 CATEGORIES = {

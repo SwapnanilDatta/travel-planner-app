@@ -9,3 +9,5 @@ dj-database-url
 whitenoise
 channels_redis
 numpy
+django-cloudinary-storage
+cloudinary
