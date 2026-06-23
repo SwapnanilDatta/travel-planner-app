@@ -36,7 +36,9 @@ def upload_chat_image(request, group_code):
         image=image_file,
     )
 
-    pil_img = Image.open(chat_image.image.path).convert('RGB')
+    # Use the original uploaded file directly to avoid crashing when Cloudinary is enabled
+    image_file.seek(0)
+    pil_img = Image.open(image_file).convert('RGB')
 
     embedding = clip_model.encode(pil_img)
     chat_image.embedding = embedding.tolist()
