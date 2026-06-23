@@ -28,7 +28,7 @@ data = data = {
 
 try:
     print("Testing the API with the proper payload...")
-    response = requests.post("http://127.0.0.1:8002/plan-trip", json=data)
+    response = requests.post("https://microservices-f9319416.fastapicloud.dev/plan-trip", json=data)
     print("Status:", response.status_code)
     try:
         print(json.dumps(response.json(), indent=2))

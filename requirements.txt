@@ -5,3 +5,7 @@ requests
 python-dotenv
 sentence-transformers
 pillow
+psycopg2-binary
+dj-database-url
+whitenoise
+channels_redis

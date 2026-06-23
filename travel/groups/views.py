@@ -182,7 +182,7 @@ def plan_itinerary(request, code):
     if request.method == 'POST':
         try:
             payload = json.loads(request.body)
-            response = requests.post('http://127.0.0.1:8002/plan-trip', json=payload)
+            response = requests.post('https://microservices-f9319416.fastapicloud.dev/plan-trip', json=payload)
             if response.status_code == 200:
                 return JsonResponse(response.json())
             else:
@@ -413,7 +413,7 @@ def regenerate_daily_plan(request, code, day_number):
                 'existing_itinerary': existing_itinerary
             }
             
-            response = requests.post('http://127.0.0.1:8002/regenerate-day', json=payload)
+            response = requests.post('https://microservices-f9319416.fastapicloud.dev/regenerate-day', json=payload)
             
             if response.status_code == 200:
                 resp_data = response.json()

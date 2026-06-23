@@ -1,0 +1,34 @@
+[project]
+name = "travel-planner-fastapi"
+version = "0.1.0"
+description = "Travel Planner FastAPI Microservice"
+requires-python = "~=3.12.0"
+
+dependencies = [
+    "fastapi==0.136.3",
+    "uvicorn==0.49.0",
+    "pydantic==2.12.5",
+    "pydantic-settings==2.10.1",
+    "requests==2.34.2",
+    "geopy==2.4.1",
+    "haversine==2.9.0",
+    "numpy==2.4.6",
+    "python-dotenv==1.2.2",
+    "overpy==0.7",
+    "httpx==0.28.1",
+    "tqdm==4.68.2",
+    "pandas==3.0.3",
+    "crewai==1.14.6",
+    "langchain-groq==1.1.3",
+    "duckduckgo-search==8.1.1",
+    "langchain-community==0.4.2",
+    "ddgs==9.14.4",
+    "litellm==1.88.1",
+    "fastapi[standard]==0.136.3"
+]
+
+[tool.fastapi]
+entrypoint = "main:app"
+
+[tool.setuptools]
+py-modules = ["agents", "main", "models", "search", "tasks", "test_api"]

@@ -17,3 +17,4 @@ duckduckgo-search
 langchain-community
 ddgs
 litellm
+fastapi[standard]
