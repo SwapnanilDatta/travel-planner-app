@@ -18,7 +18,7 @@ def search_tool(query: str) -> str:
 def get_llm():
     api_key = os.getenv("GROQ_API_KEY", "your_groq_api_key_here")
     return LLM(
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
         provider="openai",
         base_url="https://api.groq.com/openai/v1",
         api_key=api_key,
