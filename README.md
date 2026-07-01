@@ -1,226 +1,187 @@
-# 🌍 Travel Planner App
+# VoyAgent — AI Travel Planner
 
-> An intelligent, AI-powered travel planning platform that helps you discover, organize, and plan your perfect trips.
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue?style=flat-square&logo=python)](https://python.org) [![Django](https://img.shields.io/badge/Django-6.0.6%2B-darkgreen?style=flat-square&logo=django)](https://djangoproject.com) [![FastAPI](https://img.shields.io/badge/FastAPI-blue?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com) [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-[![Python](https://img.shields.io/badge/Python-3.12%2B-blue?style=flat-square&logo=python)](https://python.org)
-[![Django](https://img.shields.io/badge/Django-6.0.6%2B-darkgreen?style=flat-square&logo=django)](https://djangoproject.com)
-[![FastAPI](https://img.shields.io/badge/FastAPI-blue?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+**VoyAgent** is an AI-powered travel planning platform for solo and group travelers. Describe where you want to go, and VoyAgent builds a full multi-day itinerary — complete with destination discovery, real-time collaboration, and visual search.
 
----
-
-## ✨ Features
-
-- 🤖 **AI-Powered Agents** - Advanced CrewAI agents for intelligent travel planning and recommendations
-- 🗺️ **Smart Search** - Location-based search with geospatial analysis using Haversine distance calculations
-- 💬 **Real-Time Chat** - WebSocket-powered chat interface using Django Channels for instant communication
-- 👥 **Group Planning** - Collaborative travel planning for groups with shared itineraries
-- 🔐 **User Accounts** - Secure authentication and personalized user profiles
-- 📱 **Responsive UI** - Modern, responsive HTML5 frontend
-- 🚀 **Microservices Architecture** - Scalable FastAPI-based backend services
-- 🌐 **Multi-Source Data** - Integration with OpenStreetMap and DuckDuckGo for comprehensive travel data
+🌐 **Live demo:** [voyagent-mzei.onrender.com](https://voyagent-mzei.onrender.com)
 
 ---
 
-## 📁 Project Structure
+## What it does
+
+- **AI itinerary generation** — Multi-agent orchestration (CrewAI + LangChain) builds personalized day-by-day travel plans from a single prompt.
+- **Group planning** — Shared itineraries and user profiles so everyone in the group stays on the same page.
+- **Real-time chat** — Built-in WebSocket chat powered by Django Channels lets travelers coordinate without leaving the app.
+- **Visual search** — A dedicated CLIP-based vision microservice classifies and embeds images so you can search destinations by photo.
+- **Location-aware ranking** — Haversine distance scoring surfaces the most relevant nearby places.
+
+---
+
+## Architecture
+
+VoyAgent is split into three deployable units:
 
 ```
-travel-planner-app/
-├── travel/                      # Main Django application
-│   ├── accounts/               # User authentication & profiles
-│   ├── chat/                   # Real-time chat functionality
-│   ├── groups/                 # Group planning features
-│   ├── templates/              # HTML templates
-│   ├── static/                 # Static assets (CSS, JS)
-│   ├── travel/                 # Core Django config
-│   └── manage.py              # Django management script
-│
-├── microservices/              # FastAPI backend services
-│   ├── main.py                # FastAPI application
-│   ├── agents.py              # CrewAI agent definitions
-│   ├── tasks.py               # AI task orchestration
-│   ├── search.py              # Location search utilities
-│   ├── models.py              # Pydantic models
-│   └── requirements.txt        # Service dependencies
-│
-├── pyproject.toml             # Project configuration
-├── requirements.txt           # Main dependencies
-└── uv.lock                    # Dependency lock file
+┌─────────────────────────┐
+│    Django Frontend      │  Sessions, UI, WebSocket chat, auth
+│    (travel/)            │
+└────────────┬────────────┘
+             │ HTTP
+    ┌────────┴────────┐         ┌──────────────────────┐
+    │  FastAPI Core   │         │  FastAPI Vision       │
+    │ (microservices/)│         │  (microservice2/)     │
+    │                 │         │                       │
+    │ • /generate     │         │ • /classify (CLIP)    │
+    │ • Agent runner  │         │ • Image embeddings    │
+    │ • Search utils  │         └──────────────────────┘
+    └─────────────────┘
 ```
 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Python 3.12+**
-- **pip** or **uv** package manager
-- **Git**
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/SwapnanilDatta/travel-planner-app.git
-   cd travel-planner-app
-   ```
-
-2. **Install dependencies**
-   
-   Using `uv` (recommended):
-   ```bash
-   uv pip install -r requirements.txt
-   ```
-   
-   Or using `pip`:
-   ```bash
-   pip install -r requirements.txt
-   pip install -r microservices/requirements.txt
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-4. **Run Django migrations**
-   ```bash
-   cd travel
-   python manage.py migrate
-   ```
-
-5. **Start the development servers**
-
-   **Django application** (Terminal 1):
-   ```bash
-   cd travel
-   python manage.py runserver
-   ```
-
-   **FastAPI microservices** (Terminal 2):
-   ```bash
-   cd microservices
-   python -m uvicorn main:app --reload
-   ```
+- **`travel/`** — Django app handling the frontend, authentication, templates, and Channels-based WebSocket connections. Includes `travel/ml.py` with image preprocessing and inference helpers shared with the vision microservice.
+- **`microservices/`** — FastAPI service for itinerary generation, LLM agent orchestration, and search.
+- **`microservice2/`** — Standalone FastAPI service for CLIP-based image classification and embedding. Ships with its own Dockerfile.
 
 ---
 
-## 🔧 Tech Stack
+## Getting started
 
-### Frontend
-- **HTML5** - Semantic markup
-- **CSS3** - Responsive styling
-- **JavaScript** - Interactive features
-- **WebSockets** - Real-time communication
+**Prerequisites:** Python 3.12+, Git, Docker (recommended)
 
-### Backend
-- **Django 6.0.6+** - Web framework & ORM
-- **FastAPI** - High-performance microservices API
-- **Channels** - WebSocket support for real-time chat
-- **Daphne** - ASGI server
+### 1. Clone
 
-### AI & Intelligence
-- **CrewAI** - Multi-agent orchestration
-- **LangChain** - LLM integration
-- **LLM Support** - Groq integration via LiteLLM
-- **DuckDuckGo Search** - Web search capabilities
-
-### Data & Utilities
-- **Pydantic** - Data validation
-- **Geopy** - Geocoding services
-- **Haversine** - Distance calculations
-- **NumPy & Pandas** - Data processing
-- **OverPy** - OpenStreetMap data access
-
----
-
-## 📚 API Documentation
-
-Once the FastAPI server is running, visit:
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📝 Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-# Django Settings
-DEBUG=True
-SECRET_KEY=your-secret-key-here
-
-# Database
-DATABASE_URL=sqlite:///db.sqlite3
-
-# AI/LLM Configuration
-GROQ_API_KEY=your-groq-api-key
-LLM_MODEL=mixtral-8x7b-32768
-
-# CORS & Security
-ALLOWED_HOSTS=localhost,127.0.0.1
-CSRF_TRUSTED_ORIGINS=http://localhost:8000
+```bash
+git clone https://github.com/SwapnanilDatta/travel-planner-app.git
+cd travel-planner-app
 ```
 
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+# Fill in the values — see Environment variables below
+```
+
+### 3. Install dependencies
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -r microservices/requirements.txt
+```
+
+### 4. Run
+
+Start the Django frontend:
+
+```bash
+cd travel
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+```
+
+Start the core microservice (new terminal):
+
+```bash
+cd microservices
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
+```
+
+Optionally, start the vision microservice (new terminal):
+
+```bash
+cd microservice2
+uvicorn main:app --reload --host 0.0.0.0 --port 8002
+```
+
+Open [http://localhost:8000](http://localhost:8000). API docs are available at `/docs` on each FastAPI service.
+
 ---
 
-## 🐛 Troubleshooting
+## Environment variables
 
-### WebSocket Connection Issues
-- Ensure Daphne is running instead of the default Django development server
-- Check that Channels configuration is correct in Django settings
+| Variable | Description |
+|---|---|
+| `SECRET_KEY` | Django secret key |
+| `DEBUG` | `True` for local dev, `False` in production |
+| `DATABASE_URL` | Postgres connection string |
+| `MICROSERVICE_URL` | URL of the core FastAPI service |
+| `MICROSERVICE2_URL` | URL of the vision microservice |
+| `HF_API_TOKEN` | Hugging Face API token (for LLM/CLIP models) |
+| `OPENCAGE_API_KEY` | Geocoding API key |
+| `CLOUDINARY_URL` | Image storage (optional) |
+| `REDIS_URL` | Redis for Channels and Celery |
+| `CELERY_BROKER_URL` | Celery broker (usually same as `REDIS_URL`) |
 
-### AI Agent Timeouts
-- Verify API keys are correctly set in environment variables
-- Check network connectivity to LLM provider
-
-### Import Errors
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Use the same Python version (3.12+)
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Never commit real credentials. Use a secrets manager in production.
 
 ---
 
-## 👤 Author
+## API reference
 
-**Swapnanil Datta**
-- GitHub: [@SwapnanilDatta](https://github.com/SwapnanilDatta)
+### Core microservice (`localhost:8001`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/generate` | Generate a travel itinerary |
+| `GET` | `/health` | Service health check |
+| `GET` | `/docs` | Swagger UI |
+
+### Vision microservice (`localhost:8002`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/classify` | Classify or embed an image via CLIP |
+| `GET` | `/health` | Service health check |
+| `GET` | `/docs` | Swagger UI |
+
+See `microservices/models.py`, `microservice2/main.py`, and `travel/ml.py` for request/response schemas.
 
 ---
 
-## 🙌 Acknowledgments
+## Deployment
 
-- [Django](https://www.djangoproject.com/) - Web framework
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern API framework
-- [CrewAI](https://github.com/joaomdmoura/crewai) - AI agent orchestration
-- [LangChain](https://langchain.com/) - LLM framework
+Each unit ships its own `Dockerfile`. For production:
+
+- Use a managed **Postgres** database — remove the committed `travel/db.sqlite3` and add it to `.gitignore`.
+- Run Uvicorn with multiple workers behind NGINX or a cloud load balancer.
+- Set `DEBUG=False` and configure `ALLOWED_HOSTS`.
+- Add service-to-service authentication between microservices (JWTs or mTLS).
+- Expose `/health`, `/ready`, and `/metrics` endpoints; integrate Sentry and Prometheus.
+- Rotate secrets regularly via a secret manager.
 
 ---
 
-<div align="center">
+## Troubleshooting
 
-**[⬆ back to top](#-travel-planner-app)**
+**WebSocket errors** — Verify Django Channels is configured and you're running an ASGI server (Daphne or Uvicorn with ASGI mode).
 
-Made with ❤️ for travel enthusiasts
+**Agent timeouts** — Check that `HF_API_TOKEN` (or your LLM provider key) is valid and that outbound network access is allowed from the microservice host.
 
-</div>
+**Database errors** — Ensure `DATABASE_URL` points to a running Postgres instance and `migrate` has been applied.
+
+**Image classification issues** — Confirm the CLIP model artifacts are accessible to `microservice2` and that the preprocessing in `travel/ml.py` matches the model's expected input format.
+
+---
+
+## Contributing
+
+1. Fork the repo
+2. Create a branch: `git checkout -b feat/your-feature`
+3. Run linters locally: `black .` and `flake8`
+4. Open a pull request with a clear description of what changed and why
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+## Author
+
+**Swapnanil Datta** — [github.com/SwapnanilDatta](https://github.com/SwapnanilDatta)
+
+Built with Django, FastAPI, CrewAI, LangChain, and Django Channels.
