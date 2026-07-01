@@ -193,16 +193,16 @@ def plan_itinerary(request, code):
     initial_members = []
     total_budget = 0.0
     for pref in group.preferences.all():
-            votes = pref.category_votes or []
-            if isinstance(votes, dict):
-                votes = list(votes.keys())
+        votes = pref.category_votes or []
+        if isinstance(votes, dict):
+            votes = list(votes.keys())
 
-            initial_members.append({
-                'name': pref.user.username,
-                'age_group': pref.age_group,
-                'mobility_constraints': pref.mobility_constraints,
-                'preferences': votes
-            })
+        initial_members.append({
+            'name': pref.user.username,
+            'age_group': pref.age_group,
+            'mobility_constraints': pref.mobility_constraints,
+            'preferences': votes
+        })
         if pref.budget:
             total_budget += float(pref.budget)
             

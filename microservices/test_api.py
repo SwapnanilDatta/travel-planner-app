@@ -18,9 +18,9 @@ data = data = {
       "age_group": "30-40",
       "mobility_constraints": False,
       "preferences": {
-        "nature": 7,
-        "photography": 8,
-        "history": 2
+        "nature",
+        "photography",
+        "history"
       }
     }
   ]
