@@ -91,15 +91,18 @@
                                                 </div>
                                             </div>
 
-                                            <h6 class="text-uppercase small text-muted-editorial mb-3">Preferences (1-5)</h6>
+                                            <h6 class="text-uppercase small text-muted-editorial mb-3">Preferences</h6>
                                             <div class="row g-2">
-                                                <template x-for="(rating, category) in member.preferences" :key="category">
-                                                    <div class="col-md-4 mb-2">
-                                                        <label class="form-label text-uppercase small mb-1" x-text="category"></label>
-                                                        <input type="number" class="form-control border-editorial rounded-0 py-1"
-                                                            x-model.number="member.preferences[category]" min="1" max="5">
+                                                <template x-for="(pref, pIndex) in member.preferences" :key="pIndex">
+                                                    <div class="col-md-4 mb-2 d-flex">
+                                                        <input type="text" class="form-control border-editorial rounded-0 py-1"
+                                                            x-model="member.preferences[pIndex]">
+                                                        <button type="button" class="btn btn-sm btn-outline-danger ms-2 rounded-0" @click="member.preferences.splice(pIndex, 1)">X</button>
                                                     </div>
                                                 </template>
+                                                <div class="col-12 mt-2">
+                                                    <button type="button" class="btn btn-sm btn-editorial-outline" @click="member.preferences.push('')">+ Add Preference</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -159,11 +162,7 @@
                         name: `Member ${this.payload.members.length + 1}`,
                         age_group: "25-35",
                         mobility_constraints: false,
-                        preferences: {
-                            "nature": 5,
-                            "photography": 4,
-                            "history": 2
-                        }
+                        preferences: ["nature", "photography", "history"]
                     });
                 },
                 removeMember(index) {

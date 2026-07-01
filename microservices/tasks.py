@@ -27,7 +27,14 @@ def create_tasks(trip_details: dict):
     # collapse the group into a single "persona" or invent shared constraints.
     member_lines = []
     for m in trip_details["members"]:
-        prefs_str = ", ".join(f"{k}={v}/10" for k, v in m.get("preferences", {}).items())
+        prefs = m.get("preferences", [])
+        if isinstance(prefs, dict):
+            prefs_str = ", ".join(f"{k}" for k in prefs.keys())
+        elif isinstance(prefs, list):
+            prefs_str = ", ".join(str(p) for p in prefs if p)
+        else:
+            prefs_str = str(prefs)
+            
         member_lines.append(
             f"- {m['name']} (age {m.get('age_group', 'unknown')}): "
             f"mobility_constraints={m.get('mobility_constraints', False)}; "

@@ -5,7 +5,7 @@ class Member(BaseModel):
     name: str
     age_group: str
     mobility_constraints: bool
-    preferences: Dict[str, int]
+    preferences: List[str]
 
 class TripRequest(BaseModel):
     destinations: List[str]

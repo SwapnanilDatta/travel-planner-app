@@ -18,16 +18,13 @@
                     
                     <hr class="mb-5" style="border-top: 1px solid var(--border-color);">
                     <h3 class="mb-2" style="font-family: var(--font-heading);">Specific Interests</h3>
-                    <p class="text-muted-editorial mb-4">Add your interests (e.g., Nature, History, Food) and rate them from 1 to 10.</p>
+                    <p class="text-muted-editorial mb-4">Add your interests (e.g., Nature, History, Food).</p>
                     
                     <div class="mb-4">
                         <template x-for="(pref, index) in preferences" :key="index">
                             <div class="row mb-3 align-items-center g-2">
-                                <div class="col-md-7">
+                                <div class="col-md-10">
                                     <input type="text" class="form-control border-editorial rounded-0 py-2" x-model="pref.name" placeholder="Interest (e.g. Photography)" required>
-                                </div>
-                                <div class="col-md-3">
-                                    <input type="number" class="form-control border-editorial rounded-0 py-2" x-model="pref.score" min="1" max="10" placeholder="Score (1-10)" required>
                                 </div>
                                 <div class="col-md-2 text-end">
                                     <button type="button" class="btn btn-outline-danger rounded-0" @click="removePreference(index)">X</button>
@@ -53,27 +50,33 @@
     const INITIAL_VOTES = {{ initial_votes_json|safe }};
     document.addEventListener('alpine:init', () => {
         Alpine.data('preferenceForm', () => {
-            const initialVotes = INITIAL_VOTES || {};
+            const initialVotes = INITIAL_VOTES || [];
             const initialPrefs = [];
-            for (const [key, value] of Object.entries(initialVotes)) {
-                initialPrefs.push({name: key, score: value});
+            
+            if (Array.isArray(initialVotes)) {
+                initialVotes.forEach(v => initialPrefs.push({name: v}));
+            } else {
+                for (const [key, value] of Object.entries(initialVotes)) {
+                    initialPrefs.push({name: key});
+                }
             }
+            
             if (initialPrefs.length === 0) {
-                initialPrefs.push({name: '', score: 5});
+                initialPrefs.push({name: ''});
             }
             return {
                 preferences: initialPrefs,
                 addPreference() {
-                    this.preferences.push({name: '', score: 5});
+                    this.preferences.push({name: ''});
                 },
                 removePreference(index) {
                     this.preferences.splice(index, 1);
                 },
                 getCategoryVotes() {
-                    const votes = {};
+                    const votes = [];
                     this.preferences.forEach(p => {
                         if (p.name.trim() !== '') {
-                            votes[p.name.trim()] = parseInt(p.score) || 5;
+                            votes.push(p.name.trim());
                         }
                     });
                     return votes;

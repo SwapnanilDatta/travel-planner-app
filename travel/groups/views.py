@@ -193,12 +193,16 @@ def plan_itinerary(request, code):
     initial_members = []
     total_budget = 0.0
     for pref in group.preferences.all():
-        initial_members.append({
-            'name': pref.user.username,
-            'age_group': pref.age_group,
-            'mobility_constraints': pref.mobility_constraints,
-            'preferences': pref.category_votes or {}
-        })
+            votes = pref.category_votes or []
+            if isinstance(votes, dict):
+                votes = list(votes.keys())
+
+            initial_members.append({
+                'name': pref.user.username,
+                'age_group': pref.age_group,
+                'mobility_constraints': pref.mobility_constraints,
+                'preferences': votes
+            })
         if pref.budget:
             total_budget += float(pref.budget)
             
@@ -250,11 +254,11 @@ def plan_itinerary(request, code):
                     'name': "Host",
                     'age_group': "25-35",
                     'mobility_constraints': False,
-                    'preferences': {
-                        "nature": 5,
-                        "photography": 4,
-                        "history": 2
-                    }
+                    'preferences': [
+                        "nature",
+                        "photography",
+                        "history"
+                    ]
                 }
             ]
         }
@@ -361,11 +365,15 @@ def regenerate_daily_plan(request, code, day_number):
             initial_members = []
             total_budget = 0.0
             for pref in group.preferences.all():
+                votes = pref.category_votes or []
+                if isinstance(votes, dict):
+                    votes = list(votes.keys())
+                
                 initial_members.append({
                     'name': pref.user.username,
                     'age_group': pref.age_group,
                     'mobility_constraints': pref.mobility_constraints,
-                    'preferences': pref.category_votes or {}
+                    'preferences': votes
                 })
                 if pref.budget:
                     total_budget += float(pref.budget)
@@ -403,7 +411,7 @@ def regenerate_daily_plan(request, code, day_number):
                 'hotel_lng': hotel_lng,
                 'members': initial_members if initial_members else [{
                     'name': "Host", 'age_group': "25-35", 'mobility_constraints': False,
-                    'preferences': {"nature": 5, "photography": 4, "history": 2}
+                    'preferences': ["nature", "photography", "history"]
                 }]
             }
             
