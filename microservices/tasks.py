@@ -79,6 +79,7 @@ Hotel: {hotel_str} (FIXED - do not recommend others).
 Distribute the {min_items}-{max_items} places across the days.
 Do NOT perform web searches. Estimate travel times.
 Output a BRIEF day-by-day markdown plan. Limit explanations to 1-2 sentences per activity.
+Critically: Briefly mention which group member (by name) each activity appeals to based on their specific preferences.
 """,
         expected_output=f"Brief day-by-day markdown itinerary for {total_days} days.",
         agent=travel_expert,
@@ -96,8 +97,9 @@ def create_regenerate_task(trip_details: dict, target_day_number: int, existing_
     task = Task(
         description=f"""
 Rewrite ONLY Day {target_day_number} for {destinations_str}.
-Context: {existing_itinerary}
+Context (Existing Itinerary): {existing_itinerary}
 Keep it BRIEF and concise. DO NOT perform searches.
+CRITICAL: Do NOT reuse any attractions, restaurants, or activities that are already planned on the OTHER days in the context. Recommend completely NEW spots.
 """,
         expected_output=f"Brief completely revised plan for Day {target_day_number}.",
         agent=planning_expert,
