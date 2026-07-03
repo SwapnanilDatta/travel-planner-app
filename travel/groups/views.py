@@ -190,6 +190,21 @@ def plan_itinerary(request, code):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
+@login_required
+def check_plan_status(request, code, task_id):
+    group = get_object_or_404(ChatGroup, code=code)
+    if request.user != group.creator:
+        return JsonResponse({'status': 'error', 'message': 'Only the host can check status.'}, status=403)
+        
+    try:
+        response = requests.get(f'https://microservices-f9319416.fastapicloud.dev/plan-trip/status/{task_id}')
+        if response.status_code == 200:
+            return JsonResponse(response.json())
+        else:
+            return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
     initial_members = []
     total_budget = 0.0
     for pref in group.preferences.all():
@@ -424,16 +439,32 @@ def regenerate_daily_plan(request, code, day_number):
             response = requests.post('https://microservices-f9319416.fastapicloud.dev/regenerate-day', json=payload)
             
             if response.status_code == 200:
-                resp_data = response.json()
-                new_content = resp_data.get('content', '')
-                
-                plan = get_object_or_404(DailyPlan, itinerary=itinerary, day_number=day_number)
-                plan.content = new_content
-                plan.save()
-                
-                return JsonResponse({'status': 'success', 'content': new_content})
+                return JsonResponse(response.json())
             else:
                 return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     return JsonResponse({'status': 'error'}, status=400)
+
+@login_required
+def check_regenerate_status(request, code, day_number, task_id):
+    group = get_object_or_404(ChatGroup, code=code)
+    if request.user != group.creator:
+        return JsonResponse({'status': 'error', 'message': 'Only the host can check status.'}, status=403)
+        
+    try:
+        response = requests.get(f'https://microservices-f9319416.fastapicloud.dev/regenerate-day/status/{task_id}')
+        if response.status_code == 200:
+            resp_data = response.json()
+            if resp_data.get('status') == 'completed':
+                new_content = resp_data.get('content', '')
+                itinerary = group.trip.itinerary
+                plan = get_object_or_404(DailyPlan, itinerary=itinerary, day_number=day_number)
+                plan.content = new_content
+                plan.save()
+                return JsonResponse({'status': 'completed', 'content': new_content})
+            return JsonResponse(resp_data)
+        else:
+            return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

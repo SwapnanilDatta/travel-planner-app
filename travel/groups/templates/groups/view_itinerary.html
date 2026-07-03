@@ -222,17 +222,48 @@
                     
                     const data = await response.json();
                     
-                    if (response.ok && data.status === 'success') {
-                        this.content = data.content;
-                        this.editContent = data.content;
-                        this.successMsg = 'Day regenerated successfully!';
-                        setTimeout(() => this.successMsg = '', 3000);
+                    if (response.ok) {
+                        if (data.status === 'processing') {
+                            this.pollRegenerateStatus(data.task_id);
+                        } else {
+                            this.errorMsg = "Unexpected response from server.";
+                            this.isRegenerating = false;
+                        }
                     } else {
-                        this.errorMsg = data.message || 'Failed to regenerate day.';
+                        this.errorMsg = data.message || 'Failed to start regenerating day.';
+                        this.isRegenerating = false;
                     }
                 } catch (e) {
                     this.errorMsg = 'Network error occurred while communicating with the AI.';
-                } finally {
+                    this.isRegenerating = false;
+                }
+            },
+
+            async pollRegenerateStatus(taskId) {
+                try {
+                    const response = await fetch(`/group/{{ group.code }}/itinerary/day/${this.dayNumber}/regenerate/status/${taskId}/`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        if (data.status === 'completed') {
+                            this.content = data.content;
+                            this.editContent = data.content;
+                            this.successMsg = 'Day regenerated successfully!';
+                            this.isRegenerating = false;
+                            setTimeout(() => this.successMsg = '', 3000);
+                        } else if (data.status === 'failed') {
+                            this.errorMsg = 'Failed to regenerate day: ' + (data.error || 'Unknown error');
+                            this.isRegenerating = false;
+                        } else {
+                            // Still processing
+                            setTimeout(() => this.pollRegenerateStatus(taskId), 5000);
+                        }
+                    } else {
+                        this.errorMsg = data.message || 'Failed to check status.';
+                        this.isRegenerating = false;
+                    }
+                } catch (e) {
+                    this.errorMsg = 'Network error occurred while checking status.';
                     this.isRegenerating = false;
                 }
             }

@@ -11,8 +11,10 @@ urlpatterns = [
     path('group/<str:code>/trip/create/', views.create_trip, name='create_trip'),
     path('group/<str:code>/preference/', views.submit_preference, name='submit_preference'),
     path('group/<str:code>/plan/', views.plan_itinerary, name='plan_itinerary'),
+    path('group/<str:code>/plan/status/<str:task_id>/', views.check_plan_status, name='check_plan_status'),
     path('group/<str:code>/itinerary/', views.view_itinerary, name='view_itinerary'),
     path('group/<str:code>/itinerary/save/', views.save_itinerary, name='save_itinerary'),
     path('group/<str:code>/itinerary/day/<int:day_number>/update/', views.update_daily_plan, name='update_daily_plan'),
     path('group/<str:code>/itinerary/day/<int:day_number>/regenerate/', views.regenerate_daily_plan, name='regenerate_daily_plan'),
+    path('group/<str:code>/itinerary/day/<int:day_number>/regenerate/status/<str:task_id>/', views.check_regenerate_status, name='check_regenerate_status'),
 ]

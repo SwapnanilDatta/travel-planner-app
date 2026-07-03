@@ -113,7 +113,7 @@
                         <div class="d-grid mt-5">
                             <button type="submit" class="btn btn-editorial btn-lg py-3" :disabled="loading">
                                 <span x-show="!loading" style="letter-spacing: 0.1em;">Generate Itinerary</span>
-                                <span x-show="loading" style="letter-spacing: 0.1em;">Generating... Please Wait.</span>
+                                <span x-show="loading" style="letter-spacing: 0.1em;">Generating... This may take up to 3 minutes.</span>
                             </button>
                         </div>
 
@@ -188,30 +188,60 @@
                         const data = await response.json();
 
                         if (response.ok) {
-                            this.result = data;
-                            // Auto-save the generated itinerary
-                            const saveResponse = await fetch("{% url 'save_itinerary' group.code %}", {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                                },
-                                body: JSON.stringify({
-                                    daily_itinerary: data.travel_plan.daily_itinerary
-                                })
-                            });
-                            const saveData = await saveResponse.json();
-                            if (saveResponse.ok) {
-                                window.location.href = saveData.redirect_url;
+                            if (data.status === 'processing') {
+                                this.pollStatus(data.task_id);
                             } else {
-                                this.error = "Failed to save itinerary: " + (saveData.message || "Unknown error");
+                                this.error = "Unexpected response from server.";
+                                this.loading = false;
                             }
                         } else {
-                            this.error = data.message || "Failed to generate itinerary. Ensure the FastAPI microservice is running.";
+                            this.error = data.message || "Failed to start generating itinerary.";
+                            this.loading = false;
                         }
                     } catch (err) {
                         this.error = "A network error occurred: " + err.message;
-                    } finally {
+                        this.loading = false;
+                    }
+                },
+                async pollStatus(taskId) {
+                    try {
+                        const response = await fetch(`/group/{{ group.code }}/plan/status/${taskId}/`);
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            if (data.status === 'completed') {
+                                this.result = data.result;
+                                // Auto-save the generated itinerary
+                                const saveResponse = await fetch("{% url 'save_itinerary' group.code %}", {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                                    },
+                                    body: JSON.stringify({
+                                        daily_itinerary: data.result.travel_plan.daily_itinerary
+                                    })
+                                });
+                                const saveData = await saveResponse.json();
+                                if (saveResponse.ok) {
+                                    window.location.href = saveData.redirect_url;
+                                } else {
+                                    this.error = "Failed to save itinerary: " + (saveData.message || "Unknown error");
+                                    this.loading = false;
+                                }
+                            } else if (data.status === 'failed') {
+                                this.error = "Failed to generate itinerary: " + (data.error || "Unknown error");
+                                this.loading = false;
+                            } else {
+                                // Still processing, poll again after 5 seconds
+                                setTimeout(() => this.pollStatus(taskId), 5000);
+                            }
+                        } else {
+                            this.error = data.message || "Failed to check status.";
+                            this.loading = false;
+                        }
+                    } catch (err) {
+                        this.error = "A network error occurred while checking status: " + err.message;
                         this.loading = false;
                     }
                 }
