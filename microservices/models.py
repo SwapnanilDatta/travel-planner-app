@@ -19,6 +19,7 @@ class TripRequest(BaseModel):
     hotel_lat: float
     hotel_lng: float
     members: List[Member]
+    webhook_url: Optional[str] = None
 
 # Output schemas for the 2 JSONs
 class CityReportOutput(BaseModel):
@@ -37,3 +38,4 @@ class RegenerateDayRequest(BaseModel):
     trip_details: TripRequest
     target_day_number: int
     existing_itinerary: str
+    webhook_url: Optional[str] = None

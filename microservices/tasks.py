@@ -105,7 +105,7 @@ Use this hotel's location only as the start/end point for daily routing and
 travel-time/cost estimates.
 
 Make sure the route grouping accounts for the fact that different members
-prioritize different things (e.g. don't drop a high-priority option for one
+prioritize different things (e.g. don't drop an option for one
 member just because it doesn't suit another — instead, sequence/pair
 activities so everyone's top interests are covered across the trip).
 

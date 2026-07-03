@@ -14,6 +14,7 @@ Speed-up vs original:
 
 import asyncio
 import uuid
+import json
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from models import TripRequest, TripResponse, CityReportOutput, TravelPlanOutput, RegenerateDayRequest
 from tasks import create_tasks
@@ -21,10 +22,6 @@ from agents import get_city_local_guide, get_travel_trip_expert, get_travel_plan
 from crewai import Crew, Process
 
 app = FastAPI(title="Agentic AI Trip Planner")
-
-# In-memory store for background task results
-tasks_db: dict = {}
-
 
 async def run_plan_trip_task(task_id: str, trip_details: dict):
     try:
@@ -50,8 +47,8 @@ async def run_plan_trip_task(task_id: str, trip_details: dict):
                 getattr(crew.tasks[2].output, "raw", str(crew.tasks[2].output))
                 if crew.tasks[2].output else "Plan generation failed."
             )
-
-        tasks_db[task_id] = {
+            
+        payload = {
             "status": "completed",
             "result": TripResponse(
                 travel_plan=TravelPlanOutput(
@@ -61,22 +58,26 @@ async def run_plan_trip_task(task_id: str, trip_details: dict):
             ).model_dump()
         }
     except Exception as e:
-        tasks_db[task_id] = {"status": "failed", "error": str(e)}
+        payload = {"status": "failed", "error": str(e)}
+
+    # Send Webhook
+    webhook_url = trip_details.get("webhook_url")
+    if webhook_url:
+        import urllib.request
+        try:
+            req = urllib.request.Request(webhook_url, method="POST")
+            req.add_header('Content-Type', 'application/json')
+            data = json.dumps(payload).encode('utf-8')
+            urllib.request.urlopen(req, data=data, timeout=10)
+        except Exception as err:
+            print(f"Webhook failed: {err}")
 
 
 @app.post("/plan-trip")
 async def plan_trip(request: TripRequest, background_tasks: BackgroundTasks):
     task_id = str(uuid.uuid4())
-    tasks_db[task_id] = {"status": "processing"}
     background_tasks.add_task(run_plan_trip_task, task_id, request.model_dump())
     return {"task_id": task_id, "status": "processing"}
-
-
-@app.get("/plan-trip/status/{task_id}")
-async def plan_trip_status(task_id: str):
-    if task_id not in tasks_db:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return tasks_db[task_id]
 
 
 async def run_regenerate_day_task(task_id: str, request: RegenerateDayRequest):
@@ -103,27 +104,31 @@ async def run_regenerate_day_task(task_id: str, request: RegenerateDayRequest):
                 if crew.tasks[0].output else "Regeneration failed."
             )
 
-        tasks_db[task_id] = {
+        payload = {
             "status": "completed",
             "content": regenerated_content
         }
     except Exception as e:
-        tasks_db[task_id] = {"status": "failed", "error": str(e)}
+        payload = {"status": "failed", "error": str(e)}
+
+    # Send Webhook
+    webhook_url = request.webhook_url
+    if webhook_url:
+        import urllib.request
+        try:
+            req = urllib.request.Request(webhook_url, method="POST")
+            req.add_header('Content-Type', 'application/json')
+            data = json.dumps(payload).encode('utf-8')
+            urllib.request.urlopen(req, data=data, timeout=10)
+        except Exception as err:
+            print(f"Webhook failed: {err}")
 
 
 @app.post("/regenerate-day")
 async def regenerate_day(request: RegenerateDayRequest, background_tasks: BackgroundTasks):
     task_id = str(uuid.uuid4())
-    tasks_db[task_id] = {"status": "processing"}
     background_tasks.add_task(run_regenerate_day_task, task_id, request)
     return {"task_id": task_id, "status": "processing"}
-
-
-@app.get("/regenerate-day/status/{task_id}")
-async def regenerate_day_status(task_id: str):
-    if task_id not in tasks_db:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return tasks_db[task_id]
 
 
 if __name__ == "__main__":

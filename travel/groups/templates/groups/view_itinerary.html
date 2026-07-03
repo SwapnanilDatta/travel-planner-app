@@ -224,7 +224,7 @@
                     
                     if (response.ok) {
                         if (data.status === 'processing') {
-                            this.pollRegenerateStatus(data.task_id);
+                            this.pollRegenerateStatus();
                         } else {
                             this.errorMsg = "Unexpected response from server.";
                             this.isRegenerating = false;
@@ -239,9 +239,9 @@
                 }
             },
 
-            async pollRegenerateStatus(taskId) {
+            async pollRegenerateStatus() {
                 try {
-                    const response = await fetch(`/group/{{ group.code }}/itinerary/day/${this.dayNumber}/regenerate/status/${taskId}/`);
+                    const response = await fetch(`/group/{{ group.code }}/itinerary/day/${this.dayNumber}/regenerate/check-ready/`);
                     const data = await response.json();
                     
                     if (response.ok) {
@@ -256,7 +256,7 @@
                             this.isRegenerating = false;
                         } else {
                             // Still processing
-                            setTimeout(() => this.pollRegenerateStatus(taskId), 5000);
+                            setTimeout(() => this.pollRegenerateStatus(), 5000);
                         }
                     } else {
                         this.errorMsg = data.message || 'Failed to check status.';

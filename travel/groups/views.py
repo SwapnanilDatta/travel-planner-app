@@ -7,6 +7,7 @@ from .forms import TripForm, UserPreferenceForm
 from django.http import JsonResponse
 import json
 import re
+from django.views.decorators.csrf import csrf_exempt
 
 from django.conf import settings
 
@@ -182,6 +183,14 @@ def plan_itinerary(request, code):
     if request.method == 'POST':
         try:
             payload = json.loads(request.body)
+            
+            host = request.get_host()
+            scheme = 'https' if request.is_secure() or 'onrender' in host else 'http'
+            payload['webhook_url'] = f"{scheme}://{host}/api/webhook/plan/{code}/"
+            
+            if hasattr(group, 'trip') and hasattr(group.trip, 'itinerary'):
+                group.trip.itinerary.delete()
+                
             response = requests.post('https://microservices-f9319416.fastapicloud.dev/plan-trip', json=payload)
             if response.status_code == 200:
                 return JsonResponse(response.json())
@@ -270,19 +279,41 @@ def plan_itinerary(request, code):
     })
 
 @login_required
-def check_plan_status(request, code, task_id):
+def check_plan_ready(request, code):
     group = get_object_or_404(ChatGroup, code=code)
     if request.user != group.creator:
         return JsonResponse({'status': 'error', 'message': 'Only the host can check status.'}, status=403)
         
-    try:
-        response = requests.get(f'https://microservices-f9319416.fastapicloud.dev/plan-trip/status/{task_id}')
-        if response.status_code == 200:
-            return JsonResponse(response.json())
-        else:
-            return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    if hasattr(group, 'trip') and hasattr(group.trip, 'itinerary') and group.trip.itinerary.daily_plans.exists():
+        return JsonResponse({'status': 'completed', 'redirect_url': f'/group/{code}/itinerary/'})
+    return JsonResponse({'status': 'processing'})
+
+@csrf_exempt
+def webhook_plan_result(request, code):
+    if request.method == 'POST':
+        try:
+            group = ChatGroup.objects.get(code=code)
+            data = json.loads(request.body)
+            if data.get('status') == 'completed':
+                full_text = data['result']['travel_plan']['daily_itinerary']
+                itinerary, created = Itinerary.objects.get_or_create(trip=group.trip)
+                itinerary.daily_plans.all().delete()
+                
+                days = re.split(r'(?i)(?=(?:###\s*)?Day\s*\d+:?)', full_text)
+                day_number = 1
+                for day_content in days:
+                    day_content = day_content.strip()
+                    if day_content and re.search(r'(?i)(?:###\s*)?Day\s*\d+:?', day_content):
+                        DailyPlan.objects.create(itinerary=itinerary, day_number=day_number, content=day_content)
+                        day_number += 1
+                        
+                if day_number == 1 and full_text.strip():
+                    DailyPlan.objects.create(itinerary=itinerary, day_number=1, content=full_text)
+                    
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
 
 @login_required
 def view_itinerary(request, code):
@@ -436,6 +467,14 @@ def regenerate_daily_plan(request, code, day_number):
                 'existing_itinerary': existing_itinerary
             }
             
+            host = request.get_host()
+            scheme = 'https' if request.is_secure() or 'onrender' in host else 'http'
+            payload['webhook_url'] = f"{scheme}://{host}/api/webhook/regenerate/{code}/{day_number}/"
+            
+            plan = get_object_or_404(DailyPlan, itinerary=itinerary, day_number=day_number)
+            plan.content = "REGENERATING"
+            plan.save()
+            
             response = requests.post('https://microservices-f9319416.fastapicloud.dev/regenerate-day', json=payload)
             
             if response.status_code == 200:
@@ -447,24 +486,31 @@ def regenerate_daily_plan(request, code, day_number):
     return JsonResponse({'status': 'error'}, status=400)
 
 @login_required
-def check_regenerate_status(request, code, day_number, task_id):
+def check_regenerate_ready(request, code, day_number):
     group = get_object_or_404(ChatGroup, code=code)
     if request.user != group.creator:
         return JsonResponse({'status': 'error', 'message': 'Only the host can check status.'}, status=403)
         
     try:
-        response = requests.get(f'https://microservices-f9319416.fastapicloud.dev/regenerate-day/status/{task_id}')
-        if response.status_code == 200:
-            resp_data = response.json()
-            if resp_data.get('status') == 'completed':
-                new_content = resp_data.get('content', '')
-                itinerary = group.trip.itinerary
-                plan = get_object_or_404(DailyPlan, itinerary=itinerary, day_number=day_number)
-                plan.content = new_content
-                plan.save()
-                return JsonResponse({'status': 'completed', 'content': new_content})
-            return JsonResponse(resp_data)
-        else:
-            return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
+        plan = DailyPlan.objects.get(itinerary__trip__group=group, day_number=day_number)
+        if plan.content != "REGENERATING":
+            return JsonResponse({'status': 'completed', 'content': plan.content})
+        return JsonResponse({'status': 'processing'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@csrf_exempt
+def webhook_regenerate_result(request, code, day_number):
+    if request.method == 'POST':
+        try:
+            group = ChatGroup.objects.get(code=code)
+            data = json.loads(request.body)
+            if data.get('status') == 'completed':
+                new_content = data.get('content', '')
+                plan = DailyPlan.objects.get(itinerary__trip__group=group, day_number=day_number)
+                plan.content = new_content
+                plan.save()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
