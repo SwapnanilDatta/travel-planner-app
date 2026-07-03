@@ -310,6 +310,13 @@ def webhook_plan_result(request, code):
                 if day_number == 1 and full_text.strip():
                     DailyPlan.objects.create(itinerary=itinerary, day_number=1, content=full_text)
                     
+            elif data.get('status') == 'failed':
+                itinerary, _ = Itinerary.objects.get_or_create(trip=group.trip)
+                itinerary.daily_plans.all().delete()
+                error_msg = data.get('error', 'Unknown AI Error')
+                DailyPlan.objects.create(itinerary=itinerary, day_number=1, content=f"ERROR: {error_msg}")
+                return JsonResponse({'status': 'success'})
+                
             return JsonResponse({'status': 'success'})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
