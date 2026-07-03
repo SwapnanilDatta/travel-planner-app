@@ -18,7 +18,7 @@ import json
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from models import TripRequest, TripResponse, CityReportOutput, TravelPlanOutput, RegenerateDayRequest
 from tasks import create_tasks
-from agents import get_city_local_guide, get_travel_trip_expert, get_travel_planning_expert
+from agents import get_city_local_guide, get_travel_trip_expert
 from crewai import Crew, Process
 
 app = FastAPI(title="Agentic AI Trip Planner")
@@ -28,10 +28,9 @@ async def run_plan_trip_task(task_id: str, trip_details: dict):
         tasks = create_tasks(trip_details)
         city_guide = get_city_local_guide()
         travel_expert = get_travel_trip_expert()
-        planning_expert = get_travel_planning_expert()
 
         crew = Crew(
-            agents=[city_guide, travel_expert, planning_expert],
+            agents=[city_guide, travel_expert],
             tasks=tasks,
             process=Process.sequential,
             verbose=False,
@@ -40,12 +39,12 @@ async def run_plan_trip_task(task_id: str, trip_details: dict):
         result = await crew.kickoff_async()
 
         # ── Extract outputs ────────────────────────────────────────────────────
-        if hasattr(result, "tasks_output") and len(result.tasks_output) >= 3:
-            travel_plan_content = getattr(result.tasks_output[2], "raw", str(result.tasks_output[2]))
+        if hasattr(result, "tasks_output") and len(result.tasks_output) >= 2:
+            travel_plan_content = getattr(result.tasks_output[1], "raw", str(result.tasks_output[1]))
         else:
             travel_plan_content = (
-                getattr(crew.tasks[2].output, "raw", str(crew.tasks[2].output))
-                if crew.tasks[2].output else "Plan generation failed."
+                getattr(crew.tasks[1].output, "raw", str(crew.tasks[1].output))
+                if len(crew.tasks) > 1 and crew.tasks[1].output else "Plan generation failed."
             )
             
         payload = {
@@ -85,10 +84,10 @@ async def run_regenerate_day_task(task_id: str, request: RegenerateDayRequest):
         from tasks import create_regenerate_task
         trip_details = request.trip_details.model_dump()
         task = create_regenerate_task(trip_details, request.target_day_number, request.existing_itinerary)
-        planning_expert = get_travel_planning_expert()
+        travel_expert = get_travel_trip_expert()
 
         crew = Crew(
-            agents=[planning_expert],
+            agents=[travel_expert],
             tasks=[task],
             process=Process.sequential,
             verbose=False,

@@ -29,17 +29,11 @@ def get_llm():
 def get_city_local_guide():
     return Agent(
         role="City Local Guide Expert",
-        goal=(
-            "Provide detailed information, attractions, and hidden gems about the given "
-            "destinations that match the group's interests."
-        ),
-        backstory=(
-            "A seasoned local guide who knows the ins and outs of every destination, "
-            "keeping in mind the mobility and age constraints of the travelers."
-        ),
+        goal="Find specific attractions for the destinations matching group interests.",
+        backstory="A concise local guide focusing on core attractions.",
         verbose=True,
         allow_delegation=False,
-        max_iter=15,           # needs ~6+ searches before final answer
+        max_iter=2,
         tools=[search_tool],
         llm=get_llm(),
     )
@@ -48,31 +42,11 @@ def get_city_local_guide():
 def get_travel_trip_expert():
     return Agent(
         role="Travel Trip Expert",
-        goal="Handle logistics, routing, pacing, and location-specific budget details.",
-        backstory=(
-            "An experienced travel agent who excels at creating realistic itineraries "
-            "considering budget, pace, and group size constraints."
-        ),
+        goal="Handle logistics and compile the final day-by-day concise itinerary.",
+        backstory="An efficient travel agent who outputs brief, structured itineraries.",
         verbose=True,
         allow_delegation=False,
-        tools=[search_tool],          # cache means repeated queries cost nothing
-        llm=get_llm(),
-    )
-
-
-def get_travel_planning_expert():
-    return Agent(
-        role="Travel Planning Expert",
-        goal=(
-            "Coordinate insights from the other agents and compile the final "
-            "comprehensive day-by-day itinerary."
-        ),
-        backstory=(
-            "A master travel planner who synthesizes research and logistics into "
-            "beautiful, actionable travel plans."
-        ),
-        verbose=False,
-        allow_delegation=False,
-        # No search tool needed – works only from prior agents' outputs
+        max_iter=4,
+        tools=[search_tool],
         llm=get_llm(),
     )
