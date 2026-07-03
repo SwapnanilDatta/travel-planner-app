@@ -70,15 +70,13 @@ Research actual, specific attractions and activities that, TOGETHER, cover
 the range of interests above (e.g. if one member rates "photography" high
 and another rates "history" high, include options for both).
 
-CRITICAL — SEARCH STRATEGY: You MUST run SEPARATE searches for EACH of
-the following categories before writing your final answer (do not skip any):
-  1. "top attractions in {destinations_str}"
-  2. "best restaurants in {destinations_str}"
-  3. "things to do near {hotel_name}, {destinations_str}"
+CRITICAL — SEARCH STRATEGY: You MUST run ONLY ONE combined search query:
+  1. "top attractions, things to do, and best restaurants in {destinations_str}"
 
 CRITICAL:
-- Keep the output extremely CONCISE to save tokens. Do not write long paragraphs.
+- Keep the output extremely CONCISE to save time and tokens. Do not write long paragraphs.
 - Output a single structured JSON report listing AT LEAST {min_items} items found.
+- DO NOT perform any additional searches.
 """,
         expected_output=(
             f"A concise JSON report listing AT LEAST {min_items} items with real names, "
@@ -114,9 +112,7 @@ activities so everyone's top interests are covered across the trip).
 You MUST organize ALL items from the city report into a day-by-day grouping
 covering all {total_days} days. Be concise to save tokens.
 
-You MAY do a targeted search ONLY for transport fares or hotel-to-attraction
-travel times that are not in the city report. Keep additional searches to a
-minimum.
+CRITICAL: Do NOT perform ANY web searches for transport fares or hotel-to-attraction travel times. You must estimate them reasonably based on general knowledge to save time.
 """,
         expected_output=(
             "A logistics plan: feasible travel routes between attractions "
