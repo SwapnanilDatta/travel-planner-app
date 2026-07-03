@@ -190,21 +190,6 @@ def plan_itinerary(request, code):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-@login_required
-def check_plan_status(request, code, task_id):
-    group = get_object_or_404(ChatGroup, code=code)
-    if request.user != group.creator:
-        return JsonResponse({'status': 'error', 'message': 'Only the host can check status.'}, status=403)
-        
-    try:
-        response = requests.get(f'https://microservices-f9319416.fastapicloud.dev/plan-trip/status/{task_id}')
-        if response.status_code == 200:
-            return JsonResponse(response.json())
-        else:
-            return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-
     initial_members = []
     total_budget = 0.0
     for pref in group.preferences.all():
@@ -283,6 +268,21 @@ def check_plan_status(request, code, task_id):
         'group': group,
         'initial_data_json': json.dumps(initial_data)
     })
+
+@login_required
+def check_plan_status(request, code, task_id):
+    group = get_object_or_404(ChatGroup, code=code)
+    if request.user != group.creator:
+        return JsonResponse({'status': 'error', 'message': 'Only the host can check status.'}, status=403)
+        
+    try:
+        response = requests.get(f'https://microservices-f9319416.fastapicloud.dev/plan-trip/status/{task_id}')
+        if response.status_code == 200:
+            return JsonResponse(response.json())
+        else:
+            return JsonResponse({'status': 'error', 'message': f'FastAPI Error: {response.text}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 @login_required
 def view_itinerary(request, code):
