@@ -12,6 +12,7 @@ Key change vs original:
 This eliminates ~60-70 % of redundant network calls.
 """
 
+from crewai import Task
 from agents import get_city_local_guide, get_travel_trip_expert
 
 
