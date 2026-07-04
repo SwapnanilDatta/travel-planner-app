@@ -19,4 +19,6 @@ urlpatterns = [
     path('group/<str:code>/itinerary/day/<int:day_number>/regenerate/', views.regenerate_daily_plan, name='regenerate_daily_plan'),
     path('group/<str:code>/itinerary/day/<int:day_number>/regenerate/check-ready/', views.check_regenerate_ready, name='check_regenerate_ready'),
     path('api/webhook/regenerate/<str:code>/<int:day_number>/', views.webhook_regenerate_result, name='webhook_regenerate_result'),
+    path('budget/', views.budget_predictor, name='budget_predictor'),
+    path('api/budget/predict/', views.api_budget_predict, name='api_budget_predict'),
 ]

@@ -521,3 +521,23 @@ def webhook_regenerate_result(request, code, day_number):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
+
+@login_required
+def budget_predictor(request):
+    return render(request, 'groups/budget_predictor.html')
+
+@login_required
+@csrf_exempt
+def api_budget_predict(request):
+    if request.method == 'POST':
+        try:
+            payload = json.loads(request.body)
+            # Proxy request to Hugging Face
+            response = requests.post('https://swapnanil100-budget.hf.space/predict', json=payload, timeout=15)
+            if response.status_code == 200:
+                return JsonResponse(response.json())
+            else:
+                return JsonResponse({'status': 'error', 'message': f'Budget API Error: {response.text}'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)

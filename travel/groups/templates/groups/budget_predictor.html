@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card card-editorial">
+            <div class="card-body p-5">
+                <h2 class="font-weight-bold mb-4" style="font-family: var(--font-heading);">Budget Predictor</h2>
+                <p class="text-muted-editorial mb-4">Estimate your trip budget using our AI model. Select your destination, month, and other details below.</p>
+                
+                <form id="budgetForm">
+                    <div class="mb-3">
+                        <label for="destination" class="form-label text-muted-editorial fw-bold">Destination (City/State)</label>
+                        <select class="form-select" id="destination" name="destination" required>
+                            <option value="" disabled selected>Select a destination...</option>
+                            <option value="Goa">Goa</option>
+                            <option value="Kerala">Kerala</option>
+                            <option value="Rajasthan">Rajasthan</option>
+                            <option value="Himachal Pradesh">Himachal Pradesh</option>
+                            <option value="Uttarakhand">Uttarakhand</option>
+                            <option value="Maharashtra">Maharashtra</option>
+                            <option value="Delhi">Delhi</option>
+                            <option value="Agra">Agra</option>
+                            <option value="Karnataka">Karnataka</option>
+                            <option value="Tamil Nadu">Tamil Nadu</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="month" class="form-label text-muted-editorial fw-bold">Month of Travel</label>
+                        <select class="form-select" id="month" name="month" required>
+                            <option value="" disabled selected>Select a month...</option>
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="duration_days" class="form-label text-muted-editorial fw-bold">Duration (Days)</label>
+                            <input type="number" class="form-control" id="duration_days" name="duration_days" min="1" value="3" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="group_size" class="form-label text-muted-editorial fw-bold">Group Size (People)</label>
+                            <input type="number" class="form-control" id="group_size" name="group_size" min="1" value="2" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="pace" class="form-label text-muted-editorial fw-bold">Pace / Style</label>
+                        <select class="form-select" id="pace" name="pace" required>
+                            <option value="" disabled selected>Select trip pace...</option>
+                            <option value="Budget">Budget</option>
+                            <option value="Moderate">Moderate</option>
+                            <option value="Luxury">Luxury</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-editorial w-100 py-2" id="predictBtn">Predict Budget</button>
+                </form>
+
+                <div id="resultContainer" class="mt-5 d-none">
+                    <h4 class="font-weight-bold" style="font-family: var(--font-heading);">Prediction Results</h4>
+                    <div class="alert alert-success mt-3 border-0" style="background-color: #f8f9fa;">
+                        <p class="mb-2" style="font-size: 1.1rem;"><strong>Estimated Daily Budget:</strong> <span id="dailyBudget" class="text-success fw-bold"></span></p>
+                        <p class="mb-2" style="font-size: 1.1rem;"><strong>Estimated Total Budget:</strong> <span id="totalBudget" class="text-success fw-bold"></span></p>
+                        <hr>
+                        <p class="mb-0 small text-muted">Powered by <span id="modelUsed" class="fw-bold"></span> Model on Hugging Face</p>
+                    </div>
+                </div>
+
+                <div id="errorContainer" class="alert alert-danger mt-4 d-none"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('budgetForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('predictBtn');
+    const resultContainer = document.getElementById('resultContainer');
+    const errorContainer = document.getElementById('errorContainer');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Calculating...';
+    
+    resultContainer.classList.add('d-none');
+    errorContainer.classList.add('d-none');
+    
+    const payload = {
+        destination: document.getElementById('destination').value,
+        month: parseInt(document.getElementById('month').value),
+        duration_days: parseInt(document.getElementById('duration_days').value),
+        group_size: parseInt(document.getElementById('group_size').value),
+        pace: document.getElementById('pace').value
+    };
+    
+    fetch('{% url "api_budget_predict" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerText = 'Predict Budget';
+        
+        if(data.status === 'error') {
+            errorContainer.innerText = data.message;
+            errorContainer.classList.remove('d-none');
+        } else {
+            document.getElementById('dailyBudget').innerText = '₹ ' + data.estimated_daily_budget_inr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('totalBudget').innerText = '₹ ' + data.estimated_total_budget_inr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('modelUsed').innerText = data.model_used;
+            resultContainer.classList.remove('d-none');
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerText = 'Predict Budget';
+        errorContainer.innerText = 'An unexpected error occurred: ' + error.message;
+        errorContainer.classList.remove('d-none');
+    });
+});
+</script>
+{% endblock %}
