@@ -21,11 +21,30 @@ class TripRequest(BaseModel):
     members: List[Member]
     webhook_url: Optional[str] = None
 
-# Output schemas for the 2 JSONs
+from enum import Enum
+
+class POICategory(str, Enum):
+    NATURE = "Nature"
+    CULTURE = "Culture & History"
+    ADVENTURE = "Adventure"
+    FOOD = "Food & Drink"
+    SHOPPING = "Shopping"
+    RELAXATION = "Relaxation"
+    ENTERTAINMENT = "Entertainment"
+    OTHER = "Other"
+
+class POI(BaseModel):
+    name: str
+    category: POICategory
+    duration_minutes: int
+    best_time_to_visit: str
+    nearby_attractions: List[str]
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
 class CityReportOutput(BaseModel):
     destinations: List[str]
-    attractions_and_activities: str
-    recommendations: str
+    pois: List[POI]
 
 class TravelPlanOutput(BaseModel):
     overall_plan: str

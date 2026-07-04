@@ -13,8 +13,6 @@ tqdm
 pandas
 crewai
 langchain-groq
-duckduckgo-search
 langchain-community
-ddgs
 litellm
 fastapi[standard]
