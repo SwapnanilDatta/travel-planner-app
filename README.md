@@ -1,187 +1,178 @@
 # VoyAgent — AI Travel Planner
 
-[![Python](https://img.shields.io/badge/Python-3.12%2B-blue?style=flat-square&logo=python)](https://python.org) [![Django](https://img.shields.io/badge/Django-6.0.6%2B-darkgreen?style=flat-square&logo=django)](https://djangoproject.com) [![FastAPI](https://img.shields.io/badge/FastAPI-blue?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com) [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+VoyAgent is an AI-powered travel planning platform for solo and group travellers. Give a destination and preferences, and the system produces a day-by-day itinerary, cost estimate, and image/text embeddings to power visual search and recommendations.
 
-**VoyAgent** is an AI-powered travel planning platform for solo and group travelers. Describe where you want to go, and VoyAgent builds a full multi-day itinerary — complete with destination discovery, real-time collaboration, and visual search.
-
-🌐 **Live demo:** [voyagent-mzei.onrender.com](https://voyagent-mzei.onrender.com)
+[Live demo (unchanged)](https://voyagent-mzei.onrender.com)
 
 ---
 
-## What it does
+## What changed
 
-- **AI itinerary generation** — Multi-agent orchestration (CrewAI + LangChain) builds personalized day-by-day travel plans from a single prompt.
-- **Group planning** — Shared itineraries and user profiles so everyone in the group stays on the same page.
-- **Real-time chat** — Built-in WebSocket chat powered by Django Channels lets travelers coordinate without leaving the app.
-- **Visual search** — A dedicated CLIP-based vision microservice classifies and embeds images so you can search destinations by photo.
-- **Location-aware ranking** — Haversine distance scoring surfaces the most relevant nearby places.
+This README replaces an older architecture description. Two components and their integration have been updated:
+
+- The itinerary generator (microservices/) now runs as an agentic FastAPI service that creates tasks and completes them asynchronously. It exposes polling endpoints and supports an optional webhook to receive results when generation finishes.
+- The budget predictor remains a standalone FastAPI microservice (see budget_predictor/) but is described separately below; use its README for model and training details.
+
+The public URLs and repository layout are unchanged.
 
 ---
 
-## Architecture
+## Stack
+- Language(s): Python (backend), HTML/CSS (frontend templates)
+- Frameworks: Django (frontend + auth + WebSocket chat), FastAPI (microservices)
+- Notable libraries: Pydantic, SentenceTransformers (CLIP), XGBoost (budget model), Django Channels
 
-VoyAgent is split into three deployable units:
+## How it's organized
 
 ```
-┌─────────────────────────┐
-│    Django Frontend      │  Sessions, UI, WebSocket chat, auth
-│    (travel/)            │
-└────────────┬────────────┘
-             │ HTTP
-    ┌────────┴────────┐         ┌──────────────────────┐
-    │  FastAPI Core   │         │  FastAPI Vision       │
-    │ (microservices/)│         │  (microservice2/)     │
-    │                 │         │                       │
-    │ • /generate     │         │ • /classify (CLIP)    │
-    │ • Agent runner  │         │ • Image embeddings    │
-    │ • Search utils  │         └──────────────────────┘
-    └─────────────────┘
+travel/                 Django frontend (templates, auth, Channels WebSockets)
+microservices/          Agentic itinerary FastAPI service (async tasks)
+microservice2/          CLIP-based embedding service (text/image -> embeddings)
+budget_predictor/       Budget estimation FastAPI service + model artifacts
+README.md               This file (updated)
+requirements.txt        Root Python deps
+pyproject.toml          Project metadata
 ```
 
-- **`travel/`** — Django app handling the frontend, authentication, templates, and Channels-based WebSocket connections. Includes `travel/ml.py` with image preprocessing and inference helpers shared with the vision microservice.
-- **`microservices/`** — FastAPI service for itinerary generation, LLM agent orchestration, and search.
-- **`microservice2/`** — Standalone FastAPI service for CLIP-based image classification and embedding. Ships with its own Dockerfile.
+How it fits together: The Django frontend (travel/) is the user-facing app. It calls the itinerary microservice to request a travel plan; the microservice runs generation asynchronously (using LLM orchestration in llm_wrapper.py) and either sends a webhook to a callback URL or returns the result for the frontend to poll. The vision microservice (microservice2/) provides CLIP embeddings for images or text; the budget_predictor service returns ML-driven cost estimates for a requested trip.
 
 ---
 
-## Getting started
+## Updated architecture (short)
 
-**Prerequisites:** Python 3.12+, Git, Docker (recommended)
+- Frontend (Django) — handles sessions, user accounts, templates and Channels-based realtime chat.
+- Itinerary microservice (microservices/) — POST /plan-trip to start a job, POST /regenerate-day to regenerate a specific day, GET /task/{task_id} to poll results. Jobs run in background tasks and store results in an in-memory TASK_RESULTS dict (suitable for development; use persistent storage/queue in production). Supports sending a JSON webhook payload to a provided webhook_url once the job completes.
+- Vision microservice (microservice2/) — POST /embed accepts either `text` or `image_b64` and returns a CLIP embedding.
+- Budget predictor (budget_predictor/) — FastAPI endpoint (typically POST /predict) that returns a cost estimate using a serialized model (see budget_predictor/README.md for data and model details).
 
-### 1. Clone
+---
+
+## API reference (current)
+
+### Itinerary microservice (run from microservices/)
+- POST /plan-trip
+  - Starts an asynchronous itinerary generation task. Request should follow the TripRequest schema used by microservices/models.py. Returns {"task_id": "...", "status": "processing", ...}.
+  - Optional: include `webhook_url` in your payload to receive a POST callback when the job completes.
+
+- POST /regenerate-day
+  - Start an async task to regenerate a single day's content. Returns a task_id to poll.
+
+- GET /task/{task_id}
+  - Poll this endpoint to retrieve status and results. When completed, the service stores the response under the task_id and returns the generated content or an error.
+
+Notes: The service currently keeps results in memory (TASK_RESULTS) — replace with Redis, database, or a message queue (Celery/RQ) for production.
+
+### Vision microservice (run from microservice2/)
+- POST /embed
+  - Payload: {"text": "..."} or {"image_b64": "..."}
+  - Returns: {"embedding": [float, float, ...]}
+
+### Budget predictor (see budget_predictor/README.md)
+- POST /predict
+  - Payload example:
+    {
+      "destination": "Goa",
+      "month": 12,
+      "duration_days": 5,
+      "group_size": 2,
+      "pace": "Moderate"
+    }
+  - Returns an estimated trip cost and (optionally) per-person breakdown.
+
+---
+
+## Getting started (short path)
+
+Prerequisites: Python 3.12+, Git, Docker (optional)
+
+1) Clone
 
 ```bash
 git clone https://github.com/SwapnanilDatta/travel-planner-app.git
 cd travel-planner-app
 ```
 
-### 2. Configure environment
+2) Configure environment
 
 ```bash
 cp .env.example .env
-# Fill in the values — see Environment variables below
+# Edit .env with your keys and database URL
 ```
 
-### 3. Install dependencies
+3) Install Python dependencies (suggested inside a venv)
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+# If running microservices separately:
 pip install -r microservices/requirements.txt
+pip install -r microservice2/requirements.txt
 ```
 
-### 4. Run
-
-Start the Django frontend:
+4) Run services (development)
 
 ```bash
+# Django frontend
 cd travel
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
-```
 
-Start the core microservice (new terminal):
-
-```bash
-cd microservices
+# Core itinerary microservice (new terminal)
+cd ../microservices
 uvicorn main:app --reload --host 0.0.0.0 --port 8001
-```
 
-Optionally, start the vision microservice (new terminal):
-
-```bash
-cd microservice2
+# Vision microservice (new terminal)
+cd ../microservice2
 uvicorn main:app --reload --host 0.0.0.0 --port 8002
+
+# Budget predictor (if running locally)
+# cd ../budget_predictor
+# uvicorn main:app --reload --host 0.0.0.0 --port 7860
 ```
 
-Open [http://localhost:8000](http://localhost:8000). API docs are available at `/docs` on each FastAPI service.
+Open http://localhost:8000 for the frontend. Each FastAPI service exposes /docs for OpenAPI documentation.
 
 ---
 
-## Environment variables
-
-| Variable | Description |
-|---|---|
-| `SECRET_KEY` | Django secret key |
-| `DEBUG` | `True` for local dev, `False` in production |
-| `DATABASE_URL` | Postgres connection string |
-| `MICROSERVICE_URL` | URL of the core FastAPI service |
-| `MICROSERVICE2_URL` | URL of the vision microservice |
-| `HF_API_TOKEN` | Hugging Face API token (for LLM/CLIP models) |
-| `OPENCAGE_API_KEY` | Geocoding API key |
-| `CLOUDINARY_URL` | Image storage (optional) |
-| `REDIS_URL` | Redis for Channels and Celery |
-| `CELERY_BROKER_URL` | Celery broker (usually same as `REDIS_URL`) |
-
-Never commit real credentials. Use a secrets manager in production.
+## Environment variables (highlight)
+- SECRET_KEY — Django secret
+- DEBUG — True for dev
+- DATABASE_URL — Postgres connection string
+- MICROSERVICE_URL — core itinerary service base URL
+- MICROSERVICE2_URL — vision/embedding service URL
+- HF_API_TOKEN — Hugging Face token (for model access)
+- OPENCAGE_API_KEY — Geocoding API key
+- CLOUDINARY_URL — optional image storage
+- REDIS_URL, CELERY_BROKER_URL — recommended for production background tasks
 
 ---
 
-## API reference
-
-### Core microservice (`localhost:8001`)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/generate` | Generate a travel itinerary |
-| `GET` | `/health` | Service health check |
-| `GET` | `/docs` | Swagger UI |
-
-### Vision microservice (`localhost:8002`)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/classify` | Classify or embed an image via CLIP |
-| `GET` | `/health` | Service health check |
-| `GET` | `/docs` | Swagger UI |
-
-See `microservices/models.py`, `microservice2/main.py`, and `travel/ml.py` for request/response schemas.
-
----
-
-## Deployment
-
-Each unit ships its own `Dockerfile`. For production:
-
-- Use a managed **Postgres** database — remove the committed `travel/db.sqlite3` and add it to `.gitignore`.
-- Run Uvicorn with multiple workers behind NGINX or a cloud load balancer.
-- Set `DEBUG=False` and configure `ALLOWED_HOSTS`.
-- Add service-to-service authentication between microservices (JWTs or mTLS).
-- Expose `/health`, `/ready`, and `/metrics` endpoints; integrate Sentry and Prometheus.
-- Rotate secrets regularly via a secret manager.
-
----
-
-## Troubleshooting
-
-**WebSocket errors** — Verify Django Channels is configured and you're running an ASGI server (Daphne or Uvicorn with ASGI mode).
-
-**Agent timeouts** — Check that `HF_API_TOKEN` (or your LLM provider key) is valid and that outbound network access is allowed from the microservice host.
-
-**Database errors** — Ensure `DATABASE_URL` points to a running Postgres instance and `migrate` has been applied.
-
-**Image classification issues** — Confirm the CLIP model artifacts are accessible to `microservice2` and that the preprocessing in `travel/ml.py` matches the model's expected input format.
+## Production notes & TODO
+- Replace in-memory TASK_RESULTS with durable storage (Redis/DB) and use a proper queue (Celery/RQ) for background tasks.
+- Add authenticated service-to-service requests (JWT or mTLS) before exposing microservice endpoints.
+- Add readiness/metrics endpoints and configure logging/monitoring (Sentry/Prometheus).
+- Containerize each service and provide a docker-compose or Kubernetes manifests for deployment.
 
 ---
 
 ## Contributing
-
 1. Fork the repo
 2. Create a branch: `git checkout -b feat/your-feature`
-3. Run linters locally: `black .` and `flake8`
-4. Open a pull request with a clear description of what changed and why
+3. Run linters: `black .` and `flake8`
+4. Open a PR describing the change
 
 ---
 
 ## License
-
-MIT — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE)
 
 ---
 
 ## Author
+**Swapnanil Datta** — https://github.com/SwapnanilDatta
 
-**Swapnanil Datta** — [github.com/SwapnanilDatta](https://github.com/SwapnanilDatta)
-
-Built with Django, FastAPI, CrewAI, LangChain, and Django Channels.
+If you'd like, I can also:
+- update the budget_predictor/README to match any architecture changes you have in mind,
+- add example request payloads (TripRequest schema) or a sample webhook consumer,
+- generate docker-compose for local integration testing.
